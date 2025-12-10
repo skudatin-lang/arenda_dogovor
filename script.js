@@ -1,121 +1,81 @@
 // Основные переменные
 let currentStep = 1;
-let extractedData = {};
 let tesseractWorker = null;
-let isTesseractReady = false;
-let currentUserRole = 'tenant'; // 'tenant' или 'landlord'
+let ocrText = '';
+let currentFile = null;
 
-// Инициализация при загрузке страницы
+// Инициализация при загрузке
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM загружен, инициализируем приложение...');
-    
-    // Настройка загрузки файлов
-    setupFileUpload();
-    
-    // Загрузка сохраненных данных
+    initApp();
+    setupEventListeners();
     loadSavedData();
-    
-    // Инициализация Tesseract
-    initTesseract();
-    
-    // Устанавливаем текущую дату
-    setCurrentDate();
-    
-    // Настройка переключателя пользователя
-    setupUserSwitcher();
-    
-    console.log('Приложение инициализировано');
+    updateProgress();
 });
 
-// Настройка переключателя "Кто сканирует"
-function setupUserSwitcher() {
-    const roleSelect = document.getElementById('userRole');
-    if (roleSelect) {
-        roleSelect.addEventListener('change', function() {
-            currentUserRole = this.value;
-            console.log('Выбрана роль:', currentUserRole);
-            updateRoleInfo();
-        });
-    }
+// Инициализация приложения
+function initApp() {
+    // Установим даты по умолчанию
+    const today = new Date();
+    const nextMonth = new Date(today);
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    
+    document.getElementById('contractStart').valueAsDate = today;
+    document.getElementById('contractEnd').valueAsDate = nextMonth;
+    
+    // Инициализируем список проживающих
+    initResidents();
+    
+    // Инициализируем Tesseract в фоне
+    initTesseract();
 }
 
-// Обновление информации о роли
-function updateRoleInfo() {
-    const roleInfo = document.getElementById('roleInfo');
-    if (roleInfo) {
-        const roleText = currentUserRole === 'tenant' ? 'Арендатора' : 'Арендодателя';
-        roleInfo.textContent = `(будут заполнены данные ${roleText})`;
-    }
-}
-
-// Установка текущей даты
-function setCurrentDate() {
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
-    const monthLater = new Date(now.setMonth(now.getMonth() + 1)).toISOString().split('T')[0];
-    
-    const startInput = document.getElementById('contractStart');
-    const endInput = document.getElementById('contractEnd');
-    
-    if (startInput && !startInput.value) startInput.value = today;
-    if (endInput && !endInput.value) endInput.value = monthLater;
-}
-
-// Настройка загрузки файлов (ИСПРАВЛЕНО)
-function setupFileUpload() {
-    console.log('Настраиваем загрузку файлов...');
-    
+// Настройка обработчиков событий
+function setupEventListeners() {
+    // Загрузка файлов
+    const fileInput = document.getElementById('fileInput');
     const uploadArea = document.getElementById('uploadArea');
-    const fileInput = document.getElementById('passportInput');
+    const cameraInput = document.getElementById('cameraInput');
     
-    if (!uploadArea || !fileInput) {
-        console.error('Не найдены элементы загрузки файлов!');
-        return;
-    }
+    fileInput.addEventListener('change', handleFileSelect);
+    cameraInput.addEventListener('change', handleFileSelect);
     
-    // Клик по области загрузки
-    uploadArea.addEventListener('click', function(e) {
-        if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
-            fileInput.click();
-        }
+    // Drag & Drop
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.style.borderColor = '#764ba2';
+        uploadArea.style.background = '#e9ecef';
     });
     
-    // Перетаскивание файлов
-    uploadArea.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        this.style.borderColor = '#2980b9';
-        this.style.background = '#e3f2fd';
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.style.borderColor = '#667eea';
+        uploadArea.style.background = '#f8f9fa';
     });
     
-    uploadArea.addEventListener('dragleave', function(e) {
+    uploadArea.addEventListener('drop', (e) => {
         e.preventDefault();
-        this.style.borderColor = '#3498db';
-        this.style.background = '#f8fafc';
-    });
-    
-    uploadArea.addEventListener('drop', function(e) {
-        e.preventDefault();
-        this.style.borderColor = '#3498db';
-        this.style.background = '#f8fafc';
+        uploadArea.style.borderColor = '#667eea';
+        uploadArea.style.background = '#f8f9fa';
         
         if (e.dataTransfer.files.length) {
-            handleFileSelect(e.dataTransfer.files[0]);
+            handleFileSelect({ target: { files: e.dataTransfer.files } });
         }
     });
     
-    // Выбор файла через input
-    fileInput.addEventListener('change', function(e) {
-        if (e.target.files.length) {
-            handleFileSelect(e.target.files[0]);
-        }
-    });
-    
-    console.log('Загрузка файлов настроена');
+    // Автосохранение при вводе
+    document.addEventListener('input', debounce(saveFormData, 1000));
 }
 
-// Обработка выбранного файла (ИСПРАВЛЕНО)
-async function handleFileSelect(file) {
-    console.log('Обрабатываем файл:', file.name);
+// Открытие камеры
+function openCamera() {
+    document.getElementById('cameraInput').click();
+}
+
+// Обработка выбора файла
+function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    currentFile = file;
     
     if (!file.type.match('image.*') && !file.type.match('application/pdf')) {
         alert('Пожалуйста, выберите изображение (JPG, PNG) или PDF файл');
@@ -127,34 +87,82 @@ async function handleFileSelect(file) {
         return;
     }
     
-    showLoading('Загружаем изображение...');
-    
-    try {
-        const imageUrl = await readFileAsDataURL(file);
-        const preview = document.getElementById('passportPreview');
+    // Показать предпросмотр
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const preview = document.getElementById('imagePreview');
         const previewContainer = document.getElementById('previewContainer');
         
-        if (!preview || !previewContainer) {
-            console.error('Не найден элемент предпросмотра');
-            return;
-        }
-        
-        preview.src = imageUrl;
+        preview.src = e.target.result;
         previewContainer.style.display = 'block';
         
-        // Сохраняем данные файла для обработки
-        extractedData.fileData = imageUrl;
+        // Прокрутить к предпросмотру
+        previewContainer.scrollIntoView({ behavior: 'smooth' });
+    };
+    
+    reader.readAsDataURL(file);
+}
+
+// Очистка предпросмотра
+function clearPreview() {
+    document.getElementById('imagePreview').src = '';
+    document.getElementById('previewContainer').style.display = 'none';
+    document.getElementById('fileInput').value = '';
+    document.getElementById('cameraInput').value = '';
+    currentFile = null;
+}
+
+// Инициализация Tesseract
+async function initTesseract() {
+    try {
+        // Используем облегченную версию для русского языка
+        tesseractWorker = await Tesseract.createWorker('rus', 1, {
+            workerPath: 'https://unpkg.com/tesseract.js@v4.0.2/dist/worker.min.js',
+            langPath: 'https://tessdata.projectnaptha.com/4.0.0',
+            corePath: 'https://unpkg.com/tesseract.js-core@v4.0.2/tesseract-core.wasm.js',
+            logger: m => console.log('Tesseract:', m)
+        });
+        
+        console.log('Tesseract готов к работе');
+    } catch (error) {
+        console.error('Ошибка инициализации Tesseract:', error);
+        showNotification('Модуль распознавания текста не загрузился. Используйте ручной ввод.', 'warning');
+    }
+}
+
+// Распознавание текста
+async function recognizeText() {
+    if (!currentFile) {
+        alert('Сначала загрузите фото паспорта');
+        return;
+    }
+    
+    if (!tesseractWorker) {
+        alert('Модуль распознавания еще не готов. Используйте ручной ввод.');
+        goToStep(2);
+        return;
+    }
+    
+    showLoading('Распознаем текст... Это займет 10-20 секунд');
+    
+    try {
+        // Читаем файл как DataURL
+        const imageUrl = await readFileAsDataURL(currentFile);
+        
+        // Распознаем текст
+        const result = await tesseractWorker.recognize(imageUrl);
+        ocrText = result.data.text;
         
         hideLoading();
-        showToast('Изображение загружено! Нажмите "Распознать данные"', 'success');
         
-        // Прокручиваем к предпросмотру
-        previewContainer.scrollIntoView({ behavior: 'smooth' });
+        // Показываем распознанный текст
+        showOCRModal(ocrText);
         
     } catch (error) {
-        console.error('Ошибка загрузки файла:', error);
+        console.error('Ошибка распознавания:', error);
         hideLoading();
-        alert('Ошибка при загрузке файла. Пожалуйста, попробуйте другой файл.');
+        alert('Не удалось распознать текст. Пожалуйста, введите данные вручную.');
+        goToStep(2);
     }
 }
 
@@ -164,436 +172,389 @@ function readFileAsDataURL(file) {
         const reader = new FileReader();
         reader.onload = (e) => resolve(e.target.result);
         reader.onerror = (e) => reject(e);
-        
-        if (file.type.match('image.*')) {
-            reader.readAsDataURL(file);
-        } else if (file.type.match('application/pdf')) {
-            alert('Для PDF требуется конвертация. Для лучшего результата используйте изображения.');
-            reader.readAsDataURL(file);
-        } else {
-            reject(new Error('Неподдерживаемый формат файла'));
-        }
+        reader.readAsDataURL(file);
     });
 }
 
-// Инициализация Tesseract (УПРОЩЕНО)
-async function initTesseract() {
-    try {
-        console.log('Инициализируем Tesseract...');
-        
-        // Простая инициализация без workerPath
-        tesseractWorker = await Tesseract.createWorker('rus', 1, {
-            logger: (m) => console.log('Tesseract:', m.status || m)
-        });
-        
-        isTesseractReady = true;
-        console.log('✅ Tesseract готов к работе');
-        
-        showToast('Модуль распознавания текста загружен', 'success');
-        
-    } catch (error) {
-        console.error('❌ Ошибка инициализации Tesseract:', error);
-        showToast('Модуль распознавания не загрузился. Используйте ручной ввод.', 'error');
-        
-        // Показываем кнопку для перехода к ручному вводу
-        setTimeout(() => {
-            const step1Section = document.getElementById('step1');
-            if (step1Section) {
-                step1Section.innerHTML += `
-                    <div class="warning-box">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <p>Модуль распознавания текста не загрузился. Вы можете продолжить с ручным вводом данных.</p>
-                        <button class="btn secondary" onclick="skipToManualInput()">
-                            <i class="fas fa-keyboard"></i> Перейти к ручному вводу
-                        </button>
-                    </div>
-                `;
-            }
-        }, 1000);
-    }
+// Показать модальное окно с OCR результатом
+function showOCRModal(text) {
+    document.getElementById('ocrText').textContent = text;
+    document.getElementById('ocrModal').classList.add('active');
 }
 
-// Распознавание изображения (УПРОЩЕНО)
-async function processImage() {
-    console.log('Начинаем распознавание...');
-    
-    if (!extractedData.fileData) {
-        alert('Сначала загрузите фото паспорта');
-        return;
-    }
-    
-    if (!isTesseractReady) {
-        alert('Модуль распознавания еще не готов. Подождите или перейдите к ручному вводу.');
-        return;
-    }
-    
-    showLoading('Распознаем текст... Это займет 5-15 секунд');
-    
-    try {
-        const result = await tesseractWorker.recognize(extractedData.fileData);
-        const text = result.data.text;
-        console.log('Распознанный текст:', text);
-        
-        // Сохраняем текст
-        extractedData.rawText = text;
-        
-        // Парсим данные
-        parsePassportData(text);
-        
-        hideLoading();
-        showStep(2);
-        
-        // Показываем всплывающее окно с текстом
-        setTimeout(() => {
-            showDataExtractionPopup(text);
-        }, 500);
-        
-    } catch (error) {
-        console.error('Ошибка распознавания:', error);
-        hideLoading();
-        
-        if (confirm('Не удалось распознать текст. Перейти к ручному вводу?')) {
-            showStep(2);
-        }
-    }
+// Закрыть OCR модальное окно
+function closeOCRModal() {
+    document.getElementById('ocrModal').classList.remove('active');
 }
 
-// Упрощенный парсинг данных паспорта
-function parsePassportData(text) {
-    console.log('Парсим данные из текста...');
+// Использовать данные из OCR
+function useOCRData() {
+    if (!ocrText) return;
     
-    // Очищаем текст
-    const cleanText = text.replace(/\n/g, ' ').replace(/\s+/g, ' ');
+    // Парсим данные из текста
+    const data = parseOCRData(ocrText);
     
-    // Определяем ID полей в зависимости от роли
-    const prefix = currentUserRole === 'tenant' ? 'tenant' : 'landlord';
-    
-    // 1. Ищем ФИО
-    const fioRegex = /[А-ЯЁ][а-яё]+\s+[А-ЯЁ][а-яё]+\s+[А-ЯЁ][а-яё]+/g;
-    const fioMatches = cleanText.match(fioRegex);
-    if (fioMatches && fioMatches.length > 0) {
-        const fullName = fioMatches[0];
-        document.getElementById(`${prefix}Name`).value = fullName;
-        console.log('Найден ФИО:', fullName);
+    // Заполняем поля арендатора
+    if (data.fullName) {
+        document.getElementById('tenantName').value = data.fullName;
+    }
+    if (data.passport) {
+        document.getElementById('tenantPassport').value = data.passport;
+    }
+    if (data.issueDate) {
+        document.getElementById('tenantIssueDate').value = data.issueDate;
+    }
+    if (data.divisionCode) {
+        document.getElementById('tenantDivisionCode').value = data.divisionCode;
     }
     
-    // 2. Ищем номер паспорта (разные форматы)
-    const passportPatterns = [
-        /\d{2}\s?\d{2}\s?\d{6}/,      // 12 34 567890
-        /\d{4}\s?\d{6}/,              // 1234 567890
-        /\d{10}/                      // 1234567890
-    ];
+    closeOCRModal();
+    goToStep(2);
+}
+
+// Парсинг данных из OCR
+function parseOCRData(text) {
+    const result = {};
     
-    for (const pattern of passportPatterns) {
-        const match = cleanText.match(pattern);
-        if (match) {
-            const passportNum = match[0].replace(/\s/g, '');
-            if (passportNum.length === 10) {
-                const formatted = `${passportNum.slice(0, 2)} ${passportNum.slice(2, 4)} ${passportNum.slice(4)}`;
-                document.getElementById(`${prefix}Passport`).value = formatted;
-                console.log('Найден номер паспорта:', formatted);
-                break;
-            }
+    // Удаляем лишние пробелы
+    text = text.replace(/\s+/g, ' ').trim();
+    
+    // Поиск ФИО
+    const fioMatch = text.match(/[А-ЯЁ][а-яё]+\s+[А-ЯЁ][а-яё]+\s+[А-ЯЁ][а-яё]+/);
+    if (fioMatch) {
+        result.fullName = fioMatch[0];
+    }
+    
+    // Поиск паспортных данных
+    const passportMatch = text.match(/(\d{2}\s?\d{2}\s?\d{6})/);
+    if (passportMatch) {
+        const passport = passportMatch[1].replace(/\s/g, '');
+        if (passport.length === 10) {
+            result.passport = passport.slice(0, 4) + ' ' + passport.slice(4);
         }
     }
     
-    // 3. Ищем дату выдачи
-    const dateRegex = /(\d{2}[.\s]\d{2}[.\s]\d{4})/;
-    const dateMatch = cleanText.match(dateRegex);
+    // Поиск даты выдачи
+    const dateMatch = text.match(/(\d{2}[.\s]\d{2}[.\s]\d{4})/);
     if (dateMatch) {
-        const dateStr = dateMatch[0].replace(/\s/g, '.');
+        const dateStr = dateMatch[1].replace(/\s/g, '.');
         const [day, month, year] = dateStr.split('.');
-        if (year && year.length === 4) {
-            document.getElementById(`${prefix}IssueDate`).value = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-            console.log('Найдена дата выдачи:', dateStr);
+        if (year.length === 4) {
+            result.issueDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
         }
     }
     
-    // 4. Ищем код подразделения
-    const codeRegex = /\d{3}[-—]\d{3}/;
-    const codeMatch = cleanText.match(codeRegex);
+    // Поиск кода подразделения
+    const codeMatch = text.match(/(\d{3}[-—]\d{3})/);
     if (codeMatch) {
-        document.getElementById(`${prefix}DivisionCode`).value = codeMatch[0];
-        console.log('Найден код подразделения:', codeMatch[0]);
+        result.divisionCode = codeMatch[1];
     }
     
-    // 5. Ищем место выдачи (простой поиск)
-    const issuedKeywords = ['ОВД', 'МВД', 'УВД', 'ФМС', 'ГУВД', 'отделом', 'отделением'];
-    for (const keyword of issuedKeywords) {
-        const index = cleanText.indexOf(keyword);
-        if (index !== -1) {
-            const issuedText = cleanText.substring(index, index + 100);
-            document.getElementById(`${prefix}IssuedBy`).value = issuedText;
-            console.log('Найдено место выдачи:', issuedText.substring(0, 50));
-            break;
-        }
-    }
-    
-    showToast('Данные распознаны! Проверьте и откорректируйте при необходимости', 'success');
+    return result;
 }
 
-// Переход к ручному вводу
-function skipToManualInput() {
-    showStep(2);
-    showToast('Переходим к ручному вводу данных', 'info');
+// Пропустить OCR и перейти к ручному вводу
+function skipToManual() {
+    goToStep(2);
 }
 
-// Переснять фото
-function retakePhoto() {
-    const fileInput = document.getElementById('passportInput');
-    const previewContainer = document.getElementById('previewContainer');
-    
-    if (fileInput) fileInput.value = '';
-    if (previewContainer) previewContainer.style.display = 'none';
-    
-    extractedData.fileData = null;
-    extractedData.rawText = null;
-    
-    showToast('Изображение сброшено', 'info');
-}
-
-// Управление шагами
-function showStep(step) {
-    console.log('Переходим к шагу', step);
-    
+// Навигация по шагам
+function goToStep(step) {
     // Скрыть все шаги
-    document.querySelectorAll('.step-section').forEach(section => {
-        section.classList.remove('active');
+    document.querySelectorAll('.step').forEach(el => {
+        el.classList.remove('active');
     });
     
     // Показать нужный шаг
-    const stepElement = document.getElementById(`step${step}`);
-    if (stepElement) {
-        stepElement.classList.add('active');
-    } else {
-        console.error('Не найден элемент шага:', step);
-        return;
-    }
-    
-    // Обновить прогресс-бар
-    document.querySelectorAll('.step').forEach((stepEl, index) => {
-        if (index + 1 <= step) {
-            stepEl.classList.add('active');
-        } else {
-            stepEl.classList.remove('active');
-        }
-    });
+    document.getElementById(`step${step}`).classList.add('active');
     
     currentStep = step;
-    localStorage.setItem('currentStep', step);
+    updateProgress();
+    saveFormData();
+    
+    // Прокрутить к верху
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function nextStep() {
-    if (currentStep < 4) showStep(currentStep + 1);
-}
-
-function previousStep() {
-    if (currentStep > 1) showStep(currentStep - 1);
-}
-
-// Загрузка сохраненных данных
-function loadSavedData() {
-    try {
-        const savedStep = localStorage.getItem('currentStep');
-        if (savedStep) {
-            setTimeout(() => showStep(parseInt(savedStep)), 100);
-        }
-        
-        const savedData = localStorage.getItem('formData');
-        if (savedData) {
-            const data = JSON.parse(savedData);
-            Object.keys(data).forEach(key => {
-                const element = document.getElementById(key);
-                if (element && data[key]) {
-                    element.value = data[key];
-                }
-            });
-            console.log('Данные загружены из localStorage');
-        }
-    } catch (error) {
-        console.error('Ошибка загрузки данных:', error);
-    }
-}
-
-// Сохранение данных формы
-function saveFormData() {
-    try {
-        const formData = {};
-        document.querySelectorAll('input, textarea, select').forEach(element => {
-            if (element.id && element.id !== 'passportInput' && element.id !== 'userRole') {
-                formData[element.id] = element.value;
-            }
-        });
-        localStorage.setItem('formData', JSON.stringify(formData));
-    } catch (error) {
-        console.error('Ошибка сохранения:', error);
-    }
-}
-
-// Настройка автосохранения
-function setupAutoSave() {
-    let saveTimeout;
-    document.addEventListener('input', (e) => {
-        if (e.target.matches('input, textarea, select')) {
-            clearTimeout(saveTimeout);
-            saveTimeout = setTimeout(saveFormData, 1000);
+// Обновление прогресс-бара
+function updateProgress() {
+    const progressFill = document.getElementById('progressFill');
+    const progress = (currentStep - 1) / 2 * 100;
+    progressFill.style.width = `${progress}%`;
+    
+    // Обновить активные шаги
+    document.querySelectorAll('.step[data-step]').forEach(el => {
+        const stepNum = parseInt(el.dataset.step);
+        if (stepNum <= currentStep) {
+            el.classList.add('active');
+        } else {
+            el.classList.remove('active');
         }
     });
+}
+
+// Инициализация списка проживающих
+function initResidents() {
+    const residentsList = document.getElementById('residentsList');
+    const defaultResidents = [
+        'Адамбаев Абат',
+        'Адамбаев Джамшут',
+        'Хайтбаева Рубия',
+        'Кутлимуратов Абаз',
+        'Ибрагимов Мадер',
+        'Хайтбаева Янгилжан'
+    ];
+    
+    defaultResidents.forEach(name => {
+        addResident(name);
+    });
+}
+
+// Добавить проживающего
+function addResident(name = '') {
+    const residentsList = document.getElementById('residentsList');
+    const residentId = Date.now();
+    
+    const residentItem = document.createElement('div');
+    residentItem.className = 'resident-item';
+    residentItem.innerHTML = `
+        <input type="text" placeholder="ФИО" value="${name}" 
+               oninput="saveFormData()" class="resident-name">
+        <input type="date" placeholder="Дата рождения" 
+               oninput="saveFormData()" class="resident-birthdate">
+        <button type="button" class="resident-remove" onclick="removeResident(this)">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    residentsList.appendChild(residentItem);
+}
+
+// Удалить проживающего
+function removeResident(button) {
+    if (confirm('Удалить этого проживающего?')) {
+        button.closest('.resident-item').remove();
+        saveFormData();
+    }
 }
 
 // Генерация договора
 async function generateContract() {
-    if (!validateForm()) return;
+    // Проверка обязательных полей
+    if (!validateForm()) {
+        return;
+    }
     
     showLoading('Формируем договор...');
     
     try {
-        const contractData = collectFormData();
+        // Собираем данные
+        const data = collectFormData();
+        
+        // Загружаем шаблон
         const response = await fetch('contract.html');
-        let contractHtml = await response.text();
+        let template = await response.text();
         
-        contractHtml = replacePlaceholders(contractHtml, contractData);
-        document.getElementById('contractPreview').innerHTML = contractHtml;
+        // Заменяем плейсхолдеры
+        template = replacePlaceholders(template, data);
         
-        localStorage.setItem('contractData', JSON.stringify(contractData));
-        localStorage.setItem('contractHtml', contractHtml);
+        // Отображаем договор
+        document.getElementById('contractPreview').innerHTML = template;
         
-        hideLoading();
-        showStep(3);
+        // Переходим к шагу 3
+        setTimeout(() => {
+            hideLoading();
+            goToStep(3);
+        }, 500);
         
     } catch (error) {
         console.error('Ошибка генерации договора:', error);
         hideLoading();
-        alert('Ошибка при формировании договора. Проверьте подключение к интернету.');
+        alert('Ошибка при формировании договора. Пожалуйста, проверьте введенные данные.');
     }
+}
+
+// Сбор данных формы
+function collectFormData() {
+    // Собираем проживающих
+    const residents = [];
+    document.querySelectorAll('.resident-item').forEach(item => {
+        const name = item.querySelector('.resident-name').value;
+        const birthdate = item.querySelector('.resident-birthdate').value;
+        if (name.trim()) {
+            residents.push({
+                name: name.trim(),
+                birthdate: birthdate ? formatDate(birthdate) : ''
+            });
+        }
+    });
+    
+    // Форматирование дат
+    const formatDateRU = (dateStr) => {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = date.toLocaleDateString('ru-RU', { month: 'long' });
+        const year = date.getFullYear();
+        return `${day} ${month} ${year} г.`;
+    };
+    
+    // Конвертация чисел в слова
+    const numberToWords = (num) => {
+        const units = ['', 'один', 'два', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять'];
+        const teens = ['десять', 'одиннадцать', 'двенадцать', 'тринадцать', 'четырнадцать', 'пятнадцать', 'шестнадцать', 'семнадцать', 'восемнадцать', 'девятнадцать'];
+        const tens = ['', '', 'двадцать', 'тридцать', 'сорок', 'пятьдесят', 'шестьдесят', 'семьдесят', 'восемьдесят', 'девяносто'];
+        const hundreds = ['', 'сто', 'двести', 'триста', 'четыреста', 'пятьсот', 'шестьсот', 'семьсот', 'восемьсот', 'девятьсот'];
+        
+        let result = '';
+        let n = parseInt(num);
+        
+        if (n === 0) return 'ноль';
+        
+        // Тысячи
+        if (n >= 1000) {
+            const thousands = Math.floor(n / 1000);
+            n %= 1000;
+            if (thousands === 1) result += 'одна тысяча ';
+            else if (thousands === 2) result += 'две тысячи ';
+            else if (thousands < 5) result += numberToWords(thousands) + ' тысячи ';
+            else result += numberToWords(thousands) + ' тысяч ';
+        }
+        
+        // Сотни
+        if (n >= 100) {
+            const h = Math.floor(n / 100);
+            result += hundreds[h] + ' ';
+            n %= 100;
+        }
+        
+        // Десятки
+        if (n >= 20) {
+            const t = Math.floor(n / 10);
+            result += tens[t] + ' ';
+            n %= 10;
+        } else if (n >= 10) {
+            result += teens[n - 10] + ' ';
+            n = 0;
+        }
+        
+        // Единицы
+        if (n > 0) {
+            result += units[n] + ' ';
+        }
+        
+        return result.trim() + ' рублей';
+    };
+    
+    return {
+        // Арендодатель
+        landlordName: document.getElementById('landlordName').value,
+        landlordPassport: document.getElementById('landlordPassport').value,
+        landlordIssuedBy: document.getElementById('landlordIssuedBy').value,
+        landlordIssueDate: formatDate(document.getElementById('landlordIssueDate').value),
+        landlordDivisionCode: document.getElementById('landlordDivisionCode').value,
+        landlordRegistration: document.getElementById('landlordRegistration').value,
+        
+        // Арендатор
+        tenantName: document.getElementById('tenantName').value,
+        tenantPassport: document.getElementById('tenantPassport').value,
+        tenantIssuedBy: document.getElementById('tenantIssuedBy').value,
+        tenantIssueDate: formatDate(document.getElementById('tenantIssueDate').value),
+        tenantDivisionCode: document.getElementById('tenantDivisionCode').value,
+        tenantRegistration: document.getElementById('tenantRegistration').value,
+        
+        // Данные квартиры
+        apartmentAddress: document.getElementById('apartmentAddress').value,
+        apartmentArea: document.getElementById('apartmentArea').value,
+        roomsCount: document.getElementById('roomsCount').value,
+        basisDocument: document.getElementById('basisDocument').value,
+        
+        // Условия
+        rentAmount: document.getElementById('rentAmount').value,
+        rentAmountWords: numberToWords(document.getElementById('rentAmount').value),
+        depositAmount: document.getElementById('depositAmount').value,
+        depositAmountWords: numberToWords(document.getElementById('depositAmount').value),
+        contractStart: formatDateRU(document.getElementById('contractStart').value),
+        contractEnd: formatDateRU(document.getElementById('contractEnd').value),
+        
+        // Счетчики
+        electricityCounter: document.getElementById('electricityCounter').value || '_________',
+        hotWaterCounter: document.getElementById('hotWaterCounter').value || '_________',
+        coldWaterCounter: document.getElementById('coldWaterCounter').value || '_________',
+        
+        // Проживающие
+        residents: residents,
+        residentsList: residents.map(r => `${r.name}${r.birthdate ? `, ${r.birthdate}` : ''}`).join('\n'),
+        
+        // Текущая дата
+        currentDate: new Date().toLocaleDateString('ru-RU', {
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric'
+        })
+    };
 }
 
 // Валидация формы
 function validateForm() {
-    const requiredFields = ['landlordName', 'landlordPassport', 'tenantName', 'tenantPassport', 'apartmentAddress', 'rentAmount'];
+    const requiredFields = [
+        'landlordName',
+        'landlordPassport',
+        'landlordIssuedBy',
+        'landlordIssueDate',
+        'landlordDivisionCode',
+        'landlordRegistration',
+        'tenantName',
+        'tenantPassport',
+        'tenantIssuedBy',
+        'tenantIssueDate',
+        'tenantDivisionCode',
+        'tenantRegistration',
+        'apartmentAddress',
+        'apartmentArea',
+        'roomsCount',
+        'basisDocument',
+        'rentAmount',
+        'depositAmount',
+        'contractStart',
+        'contractEnd'
+    ];
+    
     const errors = [];
     
     requiredFields.forEach(fieldId => {
         const field = document.getElementById(fieldId);
-        if (field && !field.value.trim()) {
-            const label = field.previousElementSibling?.textContent || field.placeholder || field.name;
-            errors.push(label);
-            field.style.borderColor = '#e74c3c';
+        if (!field.value.trim()) {
+            errors.push(field.previousElementSibling.textContent);
+            field.style.borderColor = '#dc3545';
+        } else {
+            field.style.borderColor = '';
         }
     });
     
     if (errors.length > 0) {
-        alert(`Заполните обязательные поля:\n\n• ${errors.join('\n• ')}`);
+        alert('Пожалуйста, заполните все обязательные поля (помечены *):\n\n' + errors.map(e => '• ' + e).join('\n'));
         return false;
     }
     
     return true;
 }
 
-// Сбор данных для договора
-function collectFormData() {
-    const residents = [];
-    document.querySelectorAll('#residentsList .resident-item').forEach(item => {
-        const inputs = item.querySelectorAll('input');
-        if (inputs[0].value) {
-            residents.push({
-                name: inputs[0].value,
-                birthDate: inputs[1].value ? new Date(inputs[1].value).toLocaleDateString('ru-RU') : ''
-            });
-        }
+// Замена плейсхолдеров
+function replacePlaceholders(template, data) {
+    let result = template;
+    
+    // Основные поля
+    Object.keys(data).forEach(key => {
+        const regex = new RegExp(`{{${key}}}`, 'g');
+        result = result.replace(regex, data[key] || '');
     });
     
-    // Форматирование дат
-    const formatDate = (dateStr) => {
-        if (!dateStr) return '';
-        try {
-            const date = new Date(dateStr);
-            const day = date.getDate().toString().padStart(2, '0');
-            const month = date.toLocaleDateString('ru-RU', { month: 'long' });
-            const year = date.getFullYear();
-            return `${day} ${month} ${year} г.`;
-        } catch (e) {
-            return dateStr;
-        }
-    };
-    
-    const formatDateShort = (dateStr) => {
-        if (!dateStr) return '';
-        try {
-            const date = new Date(dateStr);
-            const day = date.getDate().toString().padStart(2, '0');
-            const month = (date.getMonth() + 1).toString().padStart(2, '0');
-            const year = date.getFullYear();
-            return `${day}.${month}.${year}`;
-        } catch (e) {
-            return dateStr;
-        }
-    };
-    
-    return {
-        // Данные арендодателя
-        landlordName: document.getElementById('landlordName').value,
-        landlordPassport: document.getElementById('landlordPassport').value,
-        landlordIssuedBy: document.getElementById('landlordIssuedBy').value,
-        landlordIssueDate: formatDateShort(document.getElementById('landlordIssueDate').value),
-        landlordDivisionCode: document.getElementById('landlordDivisionCode').value,
-        landlordRegistration: document.getElementById('landlordRegistration').value,
-        
-        // Данные арендатора
-        tenantName: document.getElementById('tenantName').value,
-        tenantPassport: document.getElementById('tenantPassport').value,
-        tenantIssuedBy: document.getElementById('tenantIssuedBy').value,
-        tenantIssueDate: formatDateShort(document.getElementById('tenantIssueDate').value),
-        tenantDivisionCode: document.getElementById('tenantDivisionCode').value,
-        tenantRegistration: document.getElementById('tenantRegistration').value,
-        
-        // Данные договора
-        apartmentAddress: document.getElementById('apartmentAddress').value,
-        apartmentArea: document.getElementById('apartmentArea').value,
-        roomsCount: document.getElementById('roomsCount').value,
-        rentAmount: document.getElementById('rentAmount').value,
-        rentAmountWords: numberToWordsRu(document.getElementById('rentAmount').value),
-        depositAmount: document.getElementById('depositAmount').value,
-        depositAmountWords: numberToWordsRu(document.getElementById('depositAmount').value),
-        contractStart: formatDate(document.getElementById('contractStart').value),
-        contractEnd: formatDate(document.getElementById('contractEnd').value),
-        basisDocument: document.getElementById('basisDocument').value,
-        
-        // Счетчики
-        electricityCounter: document.getElementById('electricityCounter')?.value || '_________',
-        hotWaterCounter: document.getElementById('hotWaterCounter')?.value || '_________',
-        coldWaterCounter: document.getElementById('coldWaterCounter')?.value || '_________',
-        
-        // Текущая дата
-        currentDay: new Date().getDate().toString().padStart(2, '0'),
-        currentMonth: new Date().toLocaleDateString('ru-RU', { month: 'long' }),
-        currentYear: new Date().getFullYear(),
-        currentDate: new Date().toLocaleDateString('ru-RU', {
-            day: '2-digit', month: 'long', year: 'numeric'
-        }),
-        
-        // Проживающие
-        residents: residents,
-        residentsList: residents.map(r => r.name).join(', ')
-    };
-}
-
-// Замена плейсхолдеров
-function replacePlaceholders(html, data) {
-    let result = html;
-    for (const [key, value] of Object.entries(data)) {
-        const regex = new RegExp(`{{${key}}}`, 'g');
-        result = result.replace(regex, value || '');
-    }
-    
+    // Особый обработчик для списка проживающих
     if (data.residents && data.residents.length > 0) {
         let residentsHtml = '';
         data.residents.forEach((resident, index) => {
-            residentsHtml += `
-                <div class="clause">
-                    ${index + 1}. Ф.И.О., дата рождения <strong>${resident.name}</strong>${resident.birthDate ? `, ${resident.birthDate}` : ''}
-                </div>
-            `;
+            residentsHtml += `<p>${index + 1}. Ф.И.О., дата рождения <strong>${resident.name}</strong>${resident.birthdate ? `, ${resident.birthdate}` : ''}</p>`;
         });
         result = result.replace('{{residentsDetailed}}', residentsHtml);
     }
@@ -601,7 +562,7 @@ function replacePlaceholders(html, data) {
     return result;
 }
 
-// Создание PDF
+// Скачать PDF
 async function downloadPDF() {
     showLoading('Создаем PDF...');
     
@@ -613,8 +574,11 @@ async function downloadPDF() {
             format: 'a4'
         });
         
-        const contractDiv = document.getElementById('contractPreview');
-        const canvas = await html2canvas(contractDiv, {
+        // Получаем содержимое договора
+        const contractElement = document.getElementById('contractPreview');
+        
+        // Конвертируем в изображение
+        const canvas = await html2canvas(contractElement, {
             scale: 2,
             useCORS: true,
             logging: false,
@@ -625,362 +589,264 @@ async function downloadPDF() {
         const imgWidth = 190;
         const imgHeight = (canvas.height * imgWidth) / canvas.width;
         
+        // Добавляем изображение в PDF
         doc.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
         
-        const fileName = `Договор_аренды_${document.getElementById('tenantName').value.replace(/\s+/g, '_')}.pdf`;
+        // Сохраняем файл
+        const fileName = `Договор_аренды_${document.getElementById('tenantName').value.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
         doc.save(fileName);
         
         hideLoading();
-        showStep(4);
         
     } catch (error) {
         console.error('Ошибка создания PDF:', error);
         hideLoading();
-        alert('Ошибка при создании PDF. Используйте функцию печати.');
+        alert('Ошибка при создании PDF. Пожалуйста, используйте функцию печати.');
     }
 }
 
-// Печать
+// Печать договора
 function printContract() {
-    const printContent = document.getElementById('contractPreview').innerHTML;
     const printWindow = window.open('', '_blank');
+    const contractHtml = document.getElementById('contractPreview').innerHTML;
     
     printWindow.document.write(`
+        <!DOCTYPE html>
         <html>
-            <head>
-                <title>Договор аренды</title>
-                <style>
-                    body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.6; }
-                    @media print {
-                        .no-print { display: none; }
-                        @page { margin: 15mm; }
-                    }
-                    .print-controls {
-                        position: fixed;
-                        bottom: 20px;
-                        right: 20px;
-                        background: white;
-                        padding: 15px;
-                        border-radius: 8px;
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                    }
-                </style>
-            </head>
-            <body>
-                ${printContent}
-                <div class="no-print print-controls">
-                    <button onclick="window.print()" style="padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">
-                        🖨️ Печать
-                    </button>
-                    <button onclick="window.close()" style="padding: 10px 20px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                        ✕ Закрыть
-                    </button>
-                </div>
-            </body>
+        <head>
+            <title>Договор аренды - Печать</title>
+            <style>
+                body {
+                    font-family: 'Times New Roman', serif;
+                    line-height: 1.6;
+                    margin: 20mm;
+                    font-size: 12pt;
+                }
+                .page {
+                    page-break-after: always;
+                    margin-bottom: 20mm;
+                }
+                .page:last-child {
+                    page-break-after: auto;
+                }
+                @media print {
+                    body { margin: 0; padding: 0; }
+                    .no-print { display: none; }
+                }
+            </style>
+        </head>
+        <body>
+            ${contractHtml}
+            <div class="no-print" style="position: fixed; bottom: 20px; right: 20px;">
+                <button onclick="window.print()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    Печать
+                </button>
+                <button onclick="window.close()" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; margin-left: 10px;">
+                    Закрыть
+                </button>
+            </div>
+        </body>
         </html>
     `);
     
     printWindow.document.close();
-    setTimeout(() => printWindow.print(), 500);
+    printWindow.focus();
+}
+
+// Завершить
+function finish() {
+    if (confirm('Спасибо за использование генератора договоров!\n\nНачать новый договор?')) {
+        location.reload();
+    }
 }
 
 // Вспомогательные функции
+function formatDate(dateStr) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}.${month}.${year}`;
+}
+
 function showLoading(message) {
-    let loading = document.getElementById('loadingOverlay');
-    if (!loading) {
-        loading = document.createElement('div');
-        loading.id = 'loadingOverlay';
-        loading.innerHTML = `
-            <div class="loading-content">
-                <div class="spinner"></div>
-                <p>${message}</p>
-            </div>
-        `;
-        document.body.appendChild(loading);
-        
-        const style = document.createElement('style');
-        style.textContent = `
-            #loadingOverlay {
-                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-                background: rgba(0,0,0,0.8); display: flex; align-items: center;
-                justify-content: center; z-index: 9999;
-            }
-            .loading-content {
-                background: white; padding: 40px; border-radius: 10px;
-                text-align: center;
-            }
-            .spinner {
-                border: 5px solid #f3f3f3; border-top: 5px solid #3498db;
-                border-radius: 50%; width: 50px; height: 50px;
-                animation: spin 1s linear infinite; margin: 0 auto 20px;
-            }
-            @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-            }
-        `;
-        document.head.appendChild(style);
-    }
-    loading.style.display = 'flex';
+    const modal = document.getElementById('loadingModal');
+    const text = document.getElementById('loadingText');
+    text.textContent = message;
+    modal.classList.add('active');
 }
 
 function hideLoading() {
-    const loading = document.getElementById('loadingOverlay');
-    if (loading) loading.style.display = 'none';
+    document.getElementById('loadingModal').classList.remove('active');
 }
 
-function showToast(message, type = 'info') {
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.innerHTML = `
-        <div class="toast-content">
-            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
-            <span>${message}</span>
-        </div>
+function showNotification(message, type = 'info') {
+    // Создаем уведомление
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i>
+        <span>${message}</span>
+        <button onclick="this.parentElement.remove()">&times;</button>
     `;
     
-    document.body.appendChild(toast);
+    // Стили для уведомления
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'success' ? '#d4edda' : type === 'warning' ? '#fff3cd' : '#d1ecf1'};
+        color: ${type === 'success' ? '#155724' : type === 'warning' ? '#856404' : '#0c5460'};
+        border: 1px solid ${type === 'success' ? '#c3e6cb' : type === 'warning' ? '#ffeeba' : '#bee5eb'};
+        padding: 15px 20px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        z-index: 10000;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        max-width: 400px;
+    `;
     
-    // Стили для тоста
-    if (!document.querySelector('#toast-styles')) {
-        const style = document.createElement('style');
-        style.id = 'toast-styles';
-        style.textContent = `
-            .toast {
-                position: fixed; top: 20px; right: 20px; background: white;
-                border-radius: 8px; padding: 15px 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-                z-index: 10000; transform: translateX(150%); transition: transform 0.3s ease;
-                border-left: 5px solid #3498db; max-width: 400px;
-            }
-            .toast-success { border-left-color: #2ecc71; }
-            .toast-error { border-left-color: #e74c3c; }
-            .toast-info { border-left-color: #3498db; }
-            .toast.show { transform: translateX(0); }
-            .toast-content { display: flex; align-items: center; gap: 10px; }
-            .toast i { font-size: 20px; }
-            .toast-success i { color: #2ecc71; }
-            .toast-error i { color: #e74c3c; }
-            .toast-info i { color: #3498db; }
-        `;
-        document.head.appendChild(style);
-    }
+    document.body.appendChild(notification);
     
-    setTimeout(() => toast.classList.add('show'), 100);
+    // Автоудаление через 5 секунд
     setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}
-
-// Добавление/удаление проживающих
-function addResident() {
-    const residentsList = document.getElementById('residentsList');
-    const residentItem = document.createElement('div');
-    residentItem.className = 'resident-item';
-    residentItem.innerHTML = `
-        <input type="text" placeholder="ФИО">
-        <input type="date" placeholder="Дата рождения">
-        <button class="btn-remove" onclick="removeResident(this)" title="Удалить">
-            <i class="fas fa-times"></i>
-        </button>
-    `;
-    residentsList.appendChild(residentItem);
-}
-
-function removeResident(button) {
-    if (confirm('Удалить этого проживающего?')) {
-        button.closest('.resident-item').remove();
-        saveFormData();
-    }
-}
-
-// Показать распознанный текст
-function showDataExtractionPopup(text) {
-    const popup = document.createElement('div');
-    popup.className = 'data-extraction-popup';
-    popup.innerHTML = `
-        <div class="popup-content">
-            <h3><i class="fas fa-search"></i> Распознанный текст</h3>
-            <p>Вы можете скопировать нужные данные:</p>
-            <div class="text-preview">${text.replace(/\n/g, '<br>')}</div>
-            <div class="popup-actions">
-                <button class="btn secondary" onclick="closePopup(this)">
-                    <i class="fas fa-times"></i> Закрыть
-                </button>
-                <button class="btn" onclick="copyTextToClipboard()">
-                    <i class="fas fa-copy"></i> Копировать текст
-                </button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(popup);
-    
-    const style = document.createElement('style');
-    style.textContent = `
-        .data-extraction-popup {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); display: flex; align-items: center;
-            justify-content: center; z-index: 10000; padding: 20px;
+        if (notification.parentNode) {
+            notification.remove();
         }
-        .data-extraction-popup .popup-content {
-            background: white; border-radius: 10px; padding: 25px;
-            max-width: 800px; width: 100%; max-height: 80vh; overflow-y: auto;
-        }
-        .data-extraction-popup .text-preview {
-            background: #f8f9fa; border: 1px solid #ddd; border-radius: 5px;
-            padding: 15px; margin: 15px 0; max-height: 300px;
-            overflow-y: auto; font-family: monospace; font-size: 14px;
-            line-height: 1.5;
-        }
-        .data-extraction-popup .popup-actions {
-            display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;
-        }
-    `;
-    document.head.appendChild(style);
-    
-    setTimeout(() => popup.remove(), 30000);
+    }, 5000);
 }
 
-function closePopup(button) {
-    button.closest('.data-extraction-popup').remove();
+// Debounce для автосохранения
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
 }
 
-function copyTextToClipboard() {
-    if (extractedData.rawText) {
-        navigator.clipboard.writeText(extractedData.rawText)
-            .then(() => {
-                alert('Текст скопирован в буфер обмена!');
-                document.querySelector('.data-extraction-popup')?.remove();
-            })
-            .catch(err => alert('Не удалось скопировать текст'));
-    }
-}
-
-// Конвертация числа в слова (оставьте функцию из предыдущей версии)
-function numberToWordsRu(number) {
-    // ... (оставьте функцию из предыдущего кода без изменений)
-    const units = ['', 'один', 'два', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять'];
-    const teens = ['десять', 'одиннадцать', 'двенадцать', 'тринадцать', 'четырнадцать', 'пятнадцать', 'шестнадцать', 'семнадцать', 'восемнадцать', 'девятнадцать'];
-    const tens = ['', '', 'двадцать', 'тридцать', 'сорок', 'пятьдесят', 'шестьдесят', 'семьдесят', 'восемьдесят', 'девяносто'];
-    const hundreds = ['', 'сто', 'двести', 'триста', 'четыреста', 'пятьсот', 'шестьсот', 'семьсот', 'восемьсот', 'девятьсот'];
-    
-    let num = parseInt(number);
-    if (isNaN(num) || num === 0) return 'ноль';
-    
-    let result = '';
-    
-    // Тысячи
-    const thousands = Math.floor(num / 1000);
-    if (thousands > 0) {
-        if (thousands === 1) result += 'одна тысяча ';
-        else if (thousands === 2) result += 'две тысячи ';
-        else if (thousands < 5) result += units[thousands] + ' тысячи ';
-        else if (thousands < 10) result += units[thousands] + ' тысяч ';
-        else if (thousands < 20) result += teens[thousands - 10] + ' тысяч ';
-        else {
-            const t = Math.floor(thousands / 10);
-            const u = thousands % 10;
-            result += tens[t] + ' ';
-            if (u > 0) result += units[u] + ' ';
-            result += 'тысяч ';
-        }
-        num %= 1000;
-    }
-    
-    // Сотни
-    const h = Math.floor(num / 100);
-    if (h > 0) {
-        result += hundreds[h] + ' ';
-        num %= 100;
-    }
-    
-    // Десятки и единицы
-    if (num >= 20) {
-        const t = Math.floor(num / 10);
-        result += tens[t] + ' ';
-        num %= 10;
-    }
-    
-    if (num >= 10) {
-        result += teens[num - 10] + ' ';
-        num = 0;
-    }
-    
-    if (num > 0) {
-        result += units[num] + ' ';
-    }
-    
-    result = result.trim() + ' рублей';
-    return result.charAt(0).toUpperCase() + result.slice(1);
-}
-
-// Начать новый договор
-function startNew() {
-    if (confirm('Начать новый договор? Все текущие данные будут очищены.')) {
-        // Очищаем форму
-        document.querySelectorAll('input[type="text"], input[type="number"], input[type="date"], textarea').forEach(input => {
-            if (!input.id.includes('Counter')) {
-                input.value = '';
-            }
-        });
+// Сохранение данных в localStorage
+function saveFormData() {
+    try {
+        const data = {
+            // Данные арендодателя
+            landlordName: document.getElementById('landlordName').value,
+            landlordPassport: document.getElementById('landlordPassport').value,
+            landlordIssuedBy: document.getElementById('landlordIssuedBy').value,
+            landlordIssueDate: document.getElementById('landlordIssueDate').value,
+            landlordDivisionCode: document.getElementById('landlordDivisionCode').value,
+            landlordRegistration: document.getElementById('landlordRegistration').value,
+            
+            // Данные арендатора
+            tenantName: document.getElementById('tenantName').value,
+            tenantPassport: document.getElementById('tenantPassport').value,
+            tenantIssuedBy: document.getElementById('tenantIssuedBy').value,
+            tenantIssueDate: document.getElementById('tenantIssueDate').value,
+            tenantDivisionCode: document.getElementById('tenantDivisionCode').value,
+            tenantRegistration: document.getElementById('tenantRegistration').value,
+            
+            // Данные квартиры
+            apartmentAddress: document.getElementById('apartmentAddress').value,
+            apartmentArea: document.getElementById('apartmentArea').value,
+            roomsCount: document.getElementById('roomsCount').value,
+            basisDocument: document.getElementById('basisDocument').value,
+            
+            // Условия
+            rentAmount: document.getElementById('rentAmount').value,
+            depositAmount: document.getElementById('depositAmount').value,
+            contractStart: document.getElementById('contractStart').value,
+            contractEnd: document.getElementById('contractEnd').value,
+            
+            // Счетчики
+            electricityCounter: document.getElementById('electricityCounter').value,
+            hotWaterCounter: document.getElementById('hotWaterCounter').value,
+            coldWaterCounter: document.getElementById('coldWaterCounter').value,
+            
+            // Проживающие
+            residents: Array.from(document.querySelectorAll('.resident-item')).map(item => ({
+                name: item.querySelector('.resident-name').value,
+                birthdate: item.querySelector('.resident-birthdate').value
+            })),
+            
+            // Текущий шаг
+            currentStep: currentStep
+        };
         
-        // Очищаем предпросмотр
-        const preview = document.getElementById('passportPreview');
-        const previewContainer = document.getElementById('previewContainer');
-        if (preview) preview.src = '';
-        if (previewContainer) previewContainer.style.display = 'none';
+        localStorage.setItem('rentalContractData', JSON.stringify(data));
+        console.log('Данные сохранены');
+    } catch (error) {
+        console.error('Ошибка сохранения данных:', error);
+    }
+}
+
+// Загрузка сохраненных данных
+function loadSavedData() {
+    try {
+        const saved = localStorage.getItem('rentalContractData');
+        if (!saved) return;
         
-        // Очищаем договор
-        const contractPreview = document.getElementById('contractPreview');
-        if (contractPreview) contractPreview.innerHTML = '';
+        const data = JSON.parse(saved);
         
-        // Очищаем данные
-        extractedData = {};
+        // Восстанавливаем данные арендодателя
+        if (data.landlordName) document.getElementById('landlordName').value = data.landlordName;
+        if (data.landlordPassport) document.getElementById('landlordPassport').value = data.landlordPassport;
+        if (data.landlordIssuedBy) document.getElementById('landlordIssuedBy').value = data.landlordIssuedBy;
+        if (data.landlordIssueDate) document.getElementById('landlordIssueDate').value = data.landlordIssueDate;
+        if (data.landlordDivisionCode) document.getElementById('landlordDivisionCode').value = data.landlordDivisionCode;
+        if (data.landlordRegistration) document.getElementById('landlordRegistration').value = data.landlordRegistration;
         
-        // Сбрасываем проживающих
-        const residentsList = document.getElementById('residentsList');
-        if (residentsList) {
-            residentsList.innerHTML = `
-                <div class="resident-item">
-                    <input type="text" placeholder="ФИО" value="Адамбаев Абат">
-                    <input type="date" placeholder="Дата рождения">
-                </div>
-                <div class="resident-item">
-                    <input type="text" placeholder="ФИО" value="Адамбаев Джамшут">
-                    <input type="date" placeholder="Дата рождения">
-                </div>
-                <div class="resident-item">
-                    <input type="text" placeholder="ФИО" value="Хайтбаева Рубия">
-                    <input type="date" placeholder="Дата рождения">
-                </div>
-                <div class="resident-item">
-                    <input type="text" placeholder="ФИО" value="Кутлимуратов Абаз">
-                    <input type="date" placeholder="Дата рождения">
-                </div>
-                <div class="resident-item">
-                    <input type="text" placeholder="ФИО" value="Ибрагимов Мадер">
-                    <input type="date" placeholder="Дата рождения">
-                </div>
-                <div class="resident-item">
-                    <input type="text" placeholder="ФИО" value="Хайтбаева Янгилжан">
-                    <input type="date" placeholder="Дата рождения">
-                </div>
-            `;
+        // Восстанавливаем данные арендатора
+        if (data.tenantName) document.getElementById('tenantName').value = data.tenantName;
+        if (data.tenantPassport) document.getElementById('tenantPassport').value = data.tenantPassport;
+        if (data.tenantIssuedBy) document.getElementById('tenantIssuedBy').value = data.tenantIssuedBy;
+        if (data.tenantIssueDate) document.getElementById('tenantIssueDate').value = data.tenantIssueDate;
+        if (data.tenantDivisionCode) document.getElementById('tenantDivisionCode').value = data.tenantDivisionCode;
+        if (data.tenantRegistration) document.getElementById('tenantRegistration').value = data.tenantRegistration;
+        
+        // Восстанавливаем данные квартиры
+        if (data.apartmentAddress) document.getElementById('apartmentAddress').value = data.apartmentAddress;
+        if (data.apartmentArea) document.getElementById('apartmentArea').value = data.apartmentArea;
+        if (data.roomsCount) document.getElementById('roomsCount').value = data.roomsCount;
+        if (data.basisDocument) document.getElementById('basisDocument').value = data.basisDocument;
+        
+        // Восстанавливаем условия
+        if (data.rentAmount) document.getElementById('rentAmount').value = data.rentAmount;
+        if (data.depositAmount) document.getElementById('depositAmount').value = data.depositAmount;
+        if (data.contractStart) document.getElementById('contractStart').value = data.contractStart;
+        if (data.contractEnd) document.getElementById('contractEnd').value = data.contractEnd;
+        
+        // Восстанавливаем счетчики
+        if (data.electricityCounter) document.getElementById('electricityCounter').value = data.electricityCounter;
+        if (data.hotWaterCounter) document.getElementById('hotWaterCounter').value = data.hotWaterCounter;
+        if (data.coldWaterCounter) document.getElementById('coldWaterCounter').value = data.coldWaterCounter;
+        
+        // Восстанавливаем проживающих
+        if (data.residents && data.residents.length > 0) {
+            document.getElementById('residentsList').innerHTML = '';
+            data.residents.forEach(resident => {
+                addResident(resident.name);
+                const items = document.querySelectorAll('.resident-item');
+                const lastItem = items[items.length - 1];
+                if (lastItem && resident.birthdate) {
+                    lastItem.querySelector('.resident-birthdate').value = resident.birthdate;
+                }
+            });
         }
         
-        // Устанавливаем текущие даты
-        setCurrentDate();
+        // Восстанавливаем текущий шаг
+        if (data.currentStep) {
+            goToStep(data.currentStep);
+        }
         
-        // Очищаем localStorage
-        localStorage.removeItem('formData');
-        localStorage.removeItem('currentStep');
-        localStorage.removeItem('contractData');
-        localStorage.removeItem('contractHtml');
-        
-        // Возвращаемся к первому шагу
-        showStep(1);
-        
-        showToast('Начат новый договор', 'info');
+        console.log('Данные загружены');
+    } catch (error) {
+        console.error('Ошибка загрузки данных:', error);
     }
 }
