@@ -1,4 +1,4 @@
-/* Общие стили */
+/* Сброс и базовые стили */
 * {
     margin: 0;
     padding: 0;
@@ -6,11 +6,12 @@
 }
 
 body {
-    font-family: 'Roboto', sans-serif;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    color: #333;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     min-height: 100vh;
     padding: 20px;
-    color: #333;
 }
 
 .container {
@@ -30,33 +31,24 @@ body {
     text-align: center;
 }
 
-.logo {
+.header h1 {
+    font-size: 2.5rem;
+    margin-bottom: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 15px;
-    margin-bottom: 10px;
 }
 
-.logo i {
-    font-size: 2.5rem;
-}
-
-.logo h1 {
-    font-size: 2rem;
-    font-weight: 700;
-}
-
-.subtitle {
+.header .subtitle {
     font-size: 1.1rem;
     opacity: 0.9;
-    margin-top: 10px;
 }
 
-/* Прогресс-бар */
+/* Прогресс бар */
 .progress-container {
-    padding: 30px 40px 20px;
     background: #f8f9fa;
+    padding: 30px 40px 20px;
     border-bottom: 1px solid #e9ecef;
 }
 
@@ -123,13 +115,13 @@ body {
     font-weight: 600;
 }
 
-/* Стили для шагов */
-.step {
+/* Секции */
+.step-section {
     display: none;
     padding: 40px;
 }
 
-.step.active {
+.step-section.active {
     display: block;
     animation: fadeIn 0.5s ease;
 }
@@ -139,48 +131,38 @@ body {
     to { opacity: 1; transform: translateY(0); }
 }
 
-.step-header {
-    margin-bottom: 30px;
-    text-align: center;
-}
-
-.step-header h2 {
+.step-section h2 {
     color: #2c3e50;
     font-size: 1.8rem;
-    margin-bottom: 10px;
+    margin-bottom: 30px;
     display: flex;
     align-items: center;
-    justify-content: center;
     gap: 10px;
 }
 
-.step-header p {
-    color: #6c757d;
-    font-size: 1.1rem;
+/* Шаг 1: Загрузка паспорта */
+.upload-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 30px;
+    margin-bottom: 40px;
 }
 
-/* Область загрузки */
-.upload-container {
-    max-width: 600px;
-    margin: 0 auto;
-}
-
-.upload-area {
-    border: 3px dashed #667eea;
-    border-radius: 15px;
-    padding: 60px 20px;
-    text-align: center;
+.upload-card {
     background: #f8f9fa;
+    border: 2px dashed #667eea;
+    border-radius: 15px;
+    padding: 40px 20px;
+    text-align: center;
     cursor: pointer;
     transition: all 0.3s ease;
-    position: relative;
-    margin-bottom: 20px;
 }
 
-.upload-area:hover {
+.upload-card:hover {
     background: #e9ecef;
     border-color: #764ba2;
-    transform: translateY(-2px);
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
 }
 
 .upload-icon {
@@ -189,122 +171,24 @@ body {
     margin-bottom: 20px;
 }
 
-.upload-area h3 {
+.upload-card h3 {
     color: #2c3e50;
     margin-bottom: 10px;
     font-size: 1.3rem;
 }
 
-.upload-area p {
+.upload-card p {
     color: #6c757d;
-    margin-bottom: 5px;
-}
-
-.file-types {
-    font-size: 0.9rem;
-    color: #868e96;
-    margin-bottom: 20px !important;
-}
-
-.upload-area input[type="file"] {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    top: 0;
-    left: 0;
-    opacity: 0;
-    cursor: pointer;
-}
-
-.upload-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    background: #667eea;
-    color: white;
-    padding: 12px 30px;
-    border-radius: 8px;
-    text-decoration: none;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    border: none;
     font-size: 1rem;
-}
-
-.upload-btn:hover {
-    background: #5a67d8;
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-}
-
-.camera-option {
-    text-align: center;
-    margin-bottom: 30px;
-}
-
-.camera-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    background: #28a745;
-    color: white;
-    padding: 12px 30px;
-    border-radius: 8px;
-    border: none;
-    font-size: 1rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.camera-btn:hover {
-    background: #218838;
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
-}
-
-.tips {
-    background: #e3f2fd;
-    border-radius: 10px;
-    padding: 20px;
-    border-left: 4px solid #2196f3;
-}
-
-.tips h4 {
-    color: #1565c0;
-    margin-bottom: 15px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.tips ul {
-    list-style: none;
-    padding-left: 20px;
-}
-
-.tips li {
-    margin-bottom: 8px;
-    position: relative;
-    padding-left: 25px;
-    color: #37474f;
-}
-
-.tips li:before {
-    content: '✓';
-    position: absolute;
-    left: 0;
-    color: #2196f3;
-    font-weight: bold;
 }
 
 /* Предпросмотр */
 .preview-container {
     background: white;
-    border-radius: 10px;
+    border-radius: 15px;
     border: 1px solid #dee2e6;
-    margin-top: 30px;
+    padding: 30px;
+    margin-bottom: 30px;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
 }
 
@@ -312,8 +196,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 20px;
-    border-bottom: 1px solid #dee2e6;
+    margin-bottom: 20px;
 }
 
 .preview-header h3 {
@@ -321,31 +204,13 @@ body {
     margin: 0;
 }
 
-.btn-close {
-    background: none;
-    border: none;
-    font-size: 1.2rem;
-    color: #6c757d;
-    cursor: pointer;
-    padding: 5px;
-    transition: color 0.3s ease;
-}
-
-.btn-close:hover {
-    color: #dc3545;
-}
-
-.preview-content {
-    padding: 20px;
-    text-align: center;
-}
-
 #imagePreview {
     max-width: 100%;
     max-height: 400px;
-    border-radius: 8px;
+    border-radius: 10px;
+    display: block;
+    margin: 0 auto 20px;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-    margin-bottom: 20px;
 }
 
 .preview-actions {
@@ -355,8 +220,32 @@ body {
     flex-wrap: wrap;
 }
 
+/* Разделитель */
+.or-divider {
+    text-align: center;
+    margin: 30px 0;
+    position: relative;
+}
+
+.or-divider::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: #dee2e6;
+}
+
+.or-divider span {
+    background: white;
+    padding: 0 20px;
+    color: #6c757d;
+    font-weight: 500;
+}
+
 /* Кнопки */
-.btn-primary, .btn-secondary {
+.btn-primary, .btn-secondary, .btn-small {
     display: inline-flex;
     align-items: center;
     gap: 10px;
@@ -380,6 +269,13 @@ body {
     box-shadow: 0 7px 20px rgba(102, 126, 234, 0.4);
 }
 
+.btn-primary.large {
+    padding: 18px 40px;
+    font-size: 1.1rem;
+    width: 100%;
+    justify-content: center;
+}
+
 .btn-secondary {
     background: #6c757d;
     color: white;
@@ -391,33 +287,70 @@ body {
     box-shadow: 0 7px 15px rgba(108, 117, 125, 0.3);
 }
 
-.step-actions {
+.btn-small {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+    background: #e9ecef;
+    color: #495057;
+}
+
+.btn-small:hover {
+    background: #dee2e6;
+}
+
+/* Подсказки */
+.tips {
+    background: #e8f4fc;
+    border-radius: 10px;
+    padding: 25px;
+    border-left: 5px solid #2196f3;
+    margin-top: 30px;
+}
+
+.tips h4 {
+    color: #1565c0;
+    margin-bottom: 15px;
     display: flex;
-    justify-content: space-between;
-    margin-top: 40px;
-    padding-top: 20px;
-    border-top: 1px solid #e9ecef;
+    align-items: center;
+    gap: 10px;
+}
+
+.tips ul {
+    list-style: none;
+    padding-left: 20px;
+}
+
+.tips li {
+    margin-bottom: 10px;
+    color: #37474f;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.tips li i {
+    color: #2196f3;
 }
 
 /* Форма данных */
-.data-container {
+.form-container {
     display: flex;
     flex-direction: column;
-    gap: 30px;
+    gap: 40px;
 }
 
-.data-section {
+.form-section {
     background: white;
-    border-radius: 10px;
-    padding: 25px;
+    border-radius: 15px;
+    padding: 30px;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
     border: 1px solid #e9ecef;
 }
 
-.section-title {
+.form-section h3 {
     color: #2c3e50;
-    font-size: 1.2rem;
-    margin-bottom: 20px;
+    font-size: 1.3rem;
+    margin-bottom: 25px;
     padding-bottom: 15px;
     border-bottom: 2px solid #f1f3f5;
     display: flex;
@@ -428,7 +361,7 @@ body {
 .form-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 20px;
+    gap: 25px;
 }
 
 .form-group {
@@ -442,7 +375,7 @@ body {
 
 .form-group label {
     margin-bottom: 8px;
-    font-weight: 500;
+    font-weight: 600;
     color: #495057;
     font-size: 0.95rem;
 }
@@ -450,7 +383,7 @@ body {
 .form-group input,
 .form-group textarea,
 .form-group select {
-    padding: 12px 15px;
+    padding: 14px 16px;
     border: 2px solid #e9ecef;
     border-radius: 8px;
     font-size: 1rem;
@@ -468,13 +401,15 @@ body {
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
-.form-group textarea {
-    resize: vertical;
-    min-height: 80px;
+.form-group .hint {
+    font-size: 0.85rem;
+    color: #6c757d;
+    margin-top: 5px;
+    font-style: italic;
 }
 
-/* Список проживающих */
-#residentsList {
+/* Проживающие */
+#residentsContainer {
     display: flex;
     flex-direction: column;
     gap: 15px;
@@ -511,35 +446,41 @@ body {
     transform: scale(1.1);
 }
 
-/* Предпросмотр договора */
-.contract-container {
-    margin-top: 20px;
+/* Навигационные кнопки */
+.navigation-buttons {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 50px;
+    padding-top: 30px;
+    border-top: 1px solid #e9ecef;
 }
 
-.contract-toolbar {
+/* Предпросмотр договора */
+.contract-actions {
     display: flex;
     gap: 15px;
-    margin-bottom: 20px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid #e9ecef;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
 }
 
 .contract-preview {
     background: white;
     border-radius: 10px;
-    padding: 30px;
     border: 1px solid #e9ecef;
     font-family: 'Times New Roman', serif;
     line-height: 1.6;
     font-size: 14px;
-    max-height: 600px;
+    padding: 40px;
+    max-height: 800px;
     overflow-y: auto;
+    margin-bottom: 30px;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.05);
 }
 
 .contract-preview .page {
-    margin-bottom: 40px;
-    padding-bottom: 40px;
-    border-bottom: 2px dashed #dee2e6;
+    margin-bottom: 50px;
+    padding-bottom: 50px;
+    border-bottom: 2px solid #dee2e6;
 }
 
 .contract-preview .page:last-child {
@@ -570,17 +511,55 @@ body {
 .modal-content {
     background: white;
     border-radius: 15px;
-    padding: 40px;
+    padding: 30px;
     max-width: 500px;
     width: 90%;
     text-align: center;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
 }
 
-.ocr-modal {
+#ocrModal .modal-content {
     max-width: 700px;
     max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.modal-header h3 {
+    color: #2c3e50;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #6c757d;
+    cursor: pointer;
+    padding: 5px;
+    line-height: 1;
+}
+
+.close-btn:hover {
+    color: #dc3545;
+}
+
+.modal-body {
+    flex: 1;
     overflow-y: auto;
+    margin-bottom: 20px;
 }
 
 .ocr-text {
@@ -588,7 +567,7 @@ body {
     border: 1px solid #dee2e6;
     border-radius: 8px;
     padding: 20px;
-    margin: 20px 0;
+    margin-top: 15px;
     text-align: left;
     font-family: monospace;
     white-space: pre-wrap;
@@ -596,11 +575,10 @@ body {
     overflow-y: auto;
 }
 
-.modal-actions {
+.modal-footer {
     display: flex;
     gap: 15px;
-    justify-content: center;
-    margin-top: 20px;
+    justify-content: flex-end;
 }
 
 .spinner {
@@ -618,6 +596,15 @@ body {
     100% { transform: rotate(360deg); }
 }
 
+/* Футер */
+footer {
+    background: #f8f9fa;
+    padding: 20px 40px;
+    text-align: center;
+    color: #6c757d;
+    border-top: 1px solid #e9ecef;
+}
+
 /* Адаптивность */
 @media (max-width: 768px) {
     .container {
@@ -625,12 +612,16 @@ body {
         border-radius: 15px;
     }
     
-    .header, .progress-container, .step {
+    .header, .progress-container, .step-section {
         padding: 20px;
     }
     
-    .logo h1 {
-        font-size: 1.5rem;
+    .header h1 {
+        font-size: 1.8rem;
+    }
+    
+    .upload-options {
+        grid-template-columns: 1fr;
     }
     
     .form-grid {
@@ -642,7 +633,7 @@ body {
         gap: 10px;
     }
     
-    .step-actions {
+    .navigation-buttons, .contract-actions {
         flex-direction: column;
         gap: 15px;
     }
@@ -678,20 +669,15 @@ body {
         padding: 20px 15px;
     }
     
-    .step {
+    .step-section {
         padding: 15px;
     }
     
-    .upload-area {
-        padding: 40px 15px;
+    .preview-container {
+        padding: 20px;
     }
     
-    .upload-btn, .camera-btn {
-        width: 100%;
-        justify-content: center;
-    }
-    
-    .preview-actions {
-        flex-direction: column;
+    .modal-content {
+        padding: 20px;
     }
 }
