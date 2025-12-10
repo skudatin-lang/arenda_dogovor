@@ -4,49 +4,104 @@
     <meta charset="UTF-8">
     <title>Договор аренды</title>
     <style>
-        body {
-            font-family: 'Times New Roman', serif;
-            line-height: 1.6;
-            margin: 0;
-            padding: 20px;
-            background: white;
-            color: black;
+        /* Стили для печати и отображения */
+        @media print {
+            body {
+                font-family: 'Times New Roman', serif;
+                line-height: 1.6;
+                font-size: 12pt;
+                margin: 0;
+                padding: 0;
+            }
+            
+            .page {
+                page-break-after: always;
+                padding: 20mm 15mm;
+                min-height: 297mm;
+                box-sizing: border-box;
+            }
+            
+            .page:last-child {
+                page-break-after: auto;
+            }
+            
+            .page-break {
+                page-break-before: always;
+            }
+            
+            .no-print {
+                display: none !important;
+            }
+            
+            @page {
+                margin: 15mm;
+            }
         }
         
-        .contract-container {
-            max-width: 800px;
-            margin: 0 auto;
+        @media screen {
+            body {
+                font-family: 'Times New Roman', serif;
+                line-height: 1.6;
+                font-size: 12pt;
+                margin: 0;
+                padding: 20px;
+                background: #f5f5f5;
+            }
+            
+            .page {
+                background: white;
+                box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                margin-bottom: 20px;
+                padding: 40px;
+                min-height: 297mm;
+                box-sizing: border-box;
+            }
+            
+            .page-break {
+                border-top: 2px dashed #ccc;
+                margin: 20px 0;
+                padding-top: 20px;
+            }
         }
         
         .contract-header {
             text-align: center;
-            margin-bottom: 40px;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #000;
         }
         
         .contract-title {
-            font-size: 18px;
+            font-size: 14pt;
             font-weight: bold;
             margin-bottom: 10px;
             text-transform: uppercase;
         }
         
+        .contract-subtitle {
+            font-size: 12pt;
+            margin-bottom: 15px;
+        }
+        
         .contract-date {
-            font-size: 14px;
-            margin-bottom: 30px;
+            font-size: 12pt;
+            margin-bottom: 20px;
         }
         
         .section {
-            margin-bottom: 30px;
+            margin-bottom: 25px;
         }
         
         .section-title {
             font-weight: bold;
             margin-bottom: 15px;
             text-decoration: underline;
+            font-size: 12pt;
         }
         
         .clause {
-            margin-bottom: 15px;
+            margin-bottom: 12px;
+            text-align: justify;
         }
         
         .clause-number {
@@ -54,23 +109,27 @@
         }
         
         .signature-block {
-            margin-top: 60px;
+            margin-top: 50px;
             display: flex;
             justify-content: space-between;
+            align-items: flex-end;
         }
         
         .signature {
             width: 45%;
+            text-align: center;
         }
         
         .signature-line {
-            border-top: 1px solid black;
-            margin-top: 30px;
+            border-top: 1px solid #000;
+            margin-top: 40px;
             padding-top: 5px;
+            width: 100%;
         }
         
         .underline {
             text-decoration: underline;
+            font-weight: bold;
         }
         
         .bold {
@@ -78,24 +137,67 @@
         }
         
         .indent {
-            text-indent: 20px;
+            padding-left: 20px;
+            margin: 5px 0;
         }
         
-        .page-break {
-            page-break-before: always;
+        .center {
+            text-align: center;
+        }
+        
+        .right {
+            text-align: right;
+        }
+        
+        .mt-30 {
+            margin-top: 30px;
+        }
+        
+        .mt-50 {
+            margin-top: 50px;
+        }
+        
+        .mb-20 {
+            margin-bottom: 20px;
+        }
+        
+        .page-number {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            font-size: 10pt;
+            color: #666;
+        }
+        
+        .resident-item {
+            margin-bottom: 8px;
+            padding-left: 20px;
+        }
+        
+        .passport-data {
+            margin: 15px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            background: #f9f9f9;
         }
     </style>
 </head>
 <body>
-    <div class="contract-container">
+    <!-- Страница 1 -->
+    <div class="page">
         <div class="contract-header">
-            <div class="contract-title">Договор СК-03 аренды жилого помещения</div>
-            <div class="contract-date">г. Москва «{{currentDate}}»</div>
+            <div class="contract-title">Договор СК-03</div>
+            <div class="contract-subtitle">аренды жилого помещения</div>
+            <div class="contract-date">г. Москва «{{currentDay}}» {{currentMonth}} {{currentYear}} г.</div>
         </div>
 
         <div class="section">
-            <p>Гр. <span class="underline bold">{{landlordName}}</span>, далее по тексту «Арендодатель», с одной стороны, и</p>
-            <p><span class="underline bold">{{tenantName}}</span>, именуемый в дальнейшем «Арендатор», заключили настоящий Договор о нижеследующем:</p>
+            <div class="clause">
+                Гр. <span class="underline bold">{{landlordName}}</span>, далее по тексту «Арендодатель», с одной стороны, и
+            </div>
+            <div class="clause">
+                <span class="underline bold">{{tenantName}}</span>, именуемый в дальнейшем «Арендатор», заключили настоящий Договор о нижеследующем:
+            </div>
         </div>
 
         <div class="section">
@@ -103,7 +205,9 @@
             
             <div class="clause">
                 <span class="clause-number">1.1.</span> Арендодатель за плату предоставляет Арендатору в аренду жилое помещение:
-                <p class="indent bold">«Квартира» общей площадью {{apartmentArea}} кв.м., состоящее из {{roomsCount}} комнат, расположенное по адресу: {{apartmentAddress}}</p>
+                <div class="indent bold">
+                    «Квартира» общей площадью {{apartmentArea}} кв.м., состоящее из {{roomsCount}} комнат, расположенное по адресу: {{apartmentAddress}}
+                </div>
                 телефон отсутствует
             </div>
             
@@ -128,12 +232,18 @@
             </div>
         </div>
 
+        <div class="page-number">1</div>
+    </div>
+    <!-- Конец страницы 1 -->
+
+    <!-- Страница 2 -->
+    <div class="page page-break">
         <div class="section">
             <div class="section-title">2. ПОРЯДОК ОПЛАТЫ ЖИЛОГО ПОМЕЩЕНИЯ</div>
             
             <div class="clause">
                 <span class="clause-number">2.1.</span> Размер оплаты за аренду жилого помещения устанавливается по соглашению сторон и составляет
-                <p class="indent bold">{{rentAmount}} ({{rentAmountWords}}) рублей в месяц.</p>
+                <div class="indent bold">{{rentAmount}} ({{rentAmountWords}}) рублей в месяц.</div>
             </div>
             
             <div class="clause">
@@ -142,8 +252,12 @@
             
             <div class="clause">
                 <span class="clause-number">2.3.</span> Оплата производится в следующем порядке:
-                <p class="indent">2.3.1. При подписании данного Договора Арендодатель получает от Арендатора в качестве оплаты за аренду жилого помещения за 1 (один) месяц сумму, составляющую <span class="bold">{{rentAmount}} ({{rentAmountWords}})</span> рублей, а также сумму, составляющую <span class="bold">{{rentAmount}} ({{rentAmountWords}})</span> рублей в качестве оплаты за прошедший месяц.</p>
-                <p class="indent">2.3.2. Дальнейшая оплата производится (помесячно, поквартально) помесячно регулярно «31» числа, не позднее «01» числа.</p>
+                <div class="indent">
+                    <span class="clause-number">2.3.1.</span> При подписании данного Договора Арендодатель получает от Арендатора в качестве оплаты за аренду жилого помещения за 1 (один) месяц сумму, составляющую <span class="bold">{{rentAmount}} ({{rentAmountWords}})</span> рублей, а также сумму, составляющую <span class="bold">{{rentAmount}} ({{rentAmountWords}})</span> рублей в качестве оплаты за прошедший месяц.
+                </div>
+                <div class="indent">
+                    <span class="clause-number">2.3.2.</span> Дальнейшая оплата производится (помесячно, поквартально) помесячно регулярно «31» числа, не позднее «01» числа.
+                </div>
             </div>
             
             <div class="clause">
@@ -151,7 +265,7 @@
             </div>
             
             <div class="clause">
-                <span class="clause-number">2.5.</span> Электроэнергию оплачивает <span class="bold">Арендатор</span> (Арендодатель / Арендатор). Показания счетчика на дату передачи помещения в найм ___________________________.
+                <span class="clause-number">2.5.</span> Электроэнергию оплачивает <span class="bold">Арендатор</span> (Арендодатель / Арендатор). Показания счетчика на дату передачи помещения в найм: <span class="underline">{{electricityCounter}}</span>.
             </div>
             
             <div class="clause">
@@ -163,22 +277,24 @@
             </div>
             
             <div class="clause">
-                <span class="clause-number">2.8.</span> В случае наличия счетчиков горячей и холодной воды оплату за воду производит <span class="bold">Арендатор</span> (Арендодатель / Арендатор). Показания счетчиков на дату передачи помещения в найм: горячей воды _________, холодной воды _________.
+                <span class="clause-number">2.8.</span> В случае наличия счетчиков горячей и холодной воды оплату за воду производит <span class="bold">Арендатор</span> (Арендодатель / Арендатор). Показания счетчиков на дату передачи помещения в найм: горячей воды <span class="underline">{{hotWaterCounter}}</span>, холодной воды <span class="underline">{{coldWaterCounter}}</span>.
             </div>
             
-            <div class="signature-block">
+            <div class="signature-block mt-30">
                 <div class="signature">
-                    <p>Арендодатель:</p>
+                    <div>Арендодатель:</div>
                     <div class="signature-line"></div>
-                    <p>(подпись)</p>
+                    <div>(подпись)</div>
                 </div>
                 <div class="signature">
-                    <p>Арендатор:</p>
+                    <div>Арендатор:</div>
                     <div class="signature-line"></div>
-                    <p>(подпись)</p>
+                    <div>(подпись)</div>
                 </div>
             </div>
-            
+        </div>
+
+        <div class="section mt-50">
             <div class="clause">
                 <span class="clause-number">2.9.</span> С целью материального подтверждения обязательств по п.п. 4.2. и 4.3. настоящего Договора Арендатор передает Арендодателю страховой депозит в размере: <span class="bold">{{depositAmount}} ({{depositAmountWords}})</span> рублей.
             </div>
@@ -188,8 +304,12 @@
             </div>
         </div>
 
-        <div class="page-break"></div>
+        <div class="page-number">2</div>
+    </div>
+    <!-- Конец страницы 2 -->
 
+    <!-- Страница 3 -->
+    <div class="page page-break">
         <div class="section">
             <div class="section-title">3. ПРАВА И ОБЯЗАННОСТИ АРЕНДОДАТЕЛЯ</div>
             
@@ -222,6 +342,12 @@
             </div>
         </div>
 
+        <div class="page-number">3</div>
+    </div>
+    <!-- Конец страницы 3 -->
+
+    <!-- Страница 4 -->
+    <div class="page page-break">
         <div class="section">
             <div class="section-title">4. ПРАВА И ОБЯЗАННОСТИ АРЕНДАТОРА</div>
             
@@ -265,32 +391,37 @@
                 <span class="clause-number">4.10.</span> Арендатор обязан по окончании срока аренды или в случае досрочного расторжения Договора вернуть Арендодателю в исправном состоянии с учетом естественного износа жилое помещение, установленное в нем оборудование, мебель и иное имущество, полученные им в соответствии с актом приема-передачи по Приложению № 1 путем оформления акта сдачи-приемки по Приложению № 2.
             </div>
             
-            <div class="signature-block">
+            <div class="signature-block mt-30">
                 <div class="signature">
-                    <p>Арендодатель:</p>
+                    <div>Арендодатель:</div>
                     <div class="signature-line"></div>
-                    <p>(подпись)</p>
+                    <div>(подпись)</div>
                 </div>
                 <div class="signature">
-                    <p>Арендатор:</p>
+                    <div>Арендатор:</div>
                     <div class="signature-line"></div>
-                    <p>(подпись)</p>
+                    <div>(подпись)</div>
                 </div>
             </div>
         </div>
 
-        <div class="page-break"></div>
+        <div class="page-number">4</div>
+    </div>
+    <!-- Конец страницы 4 -->
 
+    <!-- Страница 5 -->
+    <div class="page page-break">
         <div class="section">
             <div class="section-title">5. ЛИЦА, ИМЕЮЩИЕ ПРАВО ПРОЖИВАТЬ В ЖИЛОМ ПОМЕЩЕНИИ</div>
             
-            <div class="clause">
+            <div class="clause mb-20">
                 Стороны договорились, что в жилом помещении могут проживать следующие лица:
-                {{residentsDetailed}}
             </div>
+            
+            {{residentsDetailed}}
         </div>
 
-        <div class="section">
+        <div class="section mt-50">
             <div class="section-title">6. ОТВЕТСТВЕННОСТИ СТОРОН</div>
             
             <div class="clause">
@@ -318,6 +449,12 @@
             </div>
         </div>
 
+        <div class="page-number">5</div>
+    </div>
+    <!-- Конец страницы 5 -->
+
+    <!-- Страница 6 -->
+    <div class="page page-break">
         <div class="section">
             <div class="section-title">7. РАСТОРЖЕНИЕ ДОГОВОРА АРЕНДЫ ЖИЛОГО ПОМЕЩЕНИЯ</div>
             
@@ -327,11 +464,21 @@
             
             <div class="clause">
                 <span class="clause-number">7.2.</span> Данный Договор может быть расторгнут по требованию Арендодателя в следующих случаях:
-                <p class="indent">7.2.1. При несоблюдении Арендатором условий данного Договора.</p>
-                <p class="indent">7.2.2. При просрочке оплаты за аренду Арендатором более чем на один день.</p>
-                <p class="indent">7.2.3. При разрушении или порче жилого помещения, в случае причинения существенных убытков установленному в нем оборудованию, мебели и иному имуществу Арендатором или другими гражданами, за действия которых он отвечает.</p>
-                <p class="indent">7.2.4. Если Арендатор или другие граждане, за действия которых он отвечает, используют жилое помещение не по назначению или нарушают права и интересы соседей.</p>
-                <p class="indent">7.2.5. В случае досрочного расторжения настоящего Договора по вине или инициативе Арендатора страховой депозит ему не возвращается.</p>
+                <div class="indent">
+                    <span class="clause-number">7.2.1.</span> При несоблюдении Арендатором условий данного Договора.
+                </div>
+                <div class="indent">
+                    <span class="clause-number">7.2.2.</span> При просрочке оплата за аренду Арендатором более чем на один день.
+                </div>
+                <div class="indent">
+                    <span class="clause-number">7.2.3.</span> При разрушении или порче жилого помещения, в случае причинения существенных убытков установленному в нем оборудованию, мебели и иному имуществу Арендатором или другими гражданами, за действия которых он отвечает.
+                </div>
+                <div class="indent">
+                    <span class="clause-number">7.2.4.</span> Если Арендатор или другие граждане, за действия которых он отвечает, используют жилое помещение не по назначению или нарушают права и интересы соседей.
+                </div>
+                <div class="indent">
+                    <span class="clause-number">7.2.5.</span> В случае досрочного расторжения настоящего Договора по вине или инициативе Арендатора страховой депозит ему не возвращается.
+                </div>
             </div>
             
             <div class="clause">
@@ -339,44 +486,63 @@
             </div>
         </div>
 
-        <div class="section">
+        <div class="section mt-50">
             <div class="section-title">8. ПРОЧИЕ УСЛОВИЯ</div>
             
             <div class="clause">
-                Договор составлен в двух экземплярах, имеющих одинаковую юридическую силу, по одному экземпляру для каждой из сторон.
+                8.1. Договор составлен в двух экземплярах, имеющих одинаковую юридическую силу, по одному экземпляру для каждой из сторон.
             </div>
             
             <div class="clause">
-                <p>Паспортные данные Арендодателя:</p>
-                <p>ФИО: {{landlordName}}</p>
-                <p>Паспорт: {{landlordPassport}}, выдан {{landlordIssueDate}}, {{landlordIssuedBy}}, код подразделения {{landlordDivisionCode}}</p>
-                <p>Зарегистрирован(а): {{landlordRegistration}}</p>
+                8.2. Паспортные данные сторон:
+            </div>
+            
+            <div class="passport-data">
+                <div class="bold mb-20">АРЕНДОДАТЕЛЬ:</div>
+                <div>ФИО: {{landlordName}}</div>
+                <div>Паспорт: серия/номер {{landlordPassport}}</div>
+                <div>Выдан: {{landlordIssueDate}}, {{landlordIssuedBy}}</div>
+                <div>Код подразделения: {{landlordDivisionCode}}</div>
+                <div>Зарегистрирован(а): {{landlordRegistration}}</div>
+            </div>
+            
+            <div class="passport-data">
+                <div class="bold mb-20">АРЕНДАТОР:</div>
+                <div>ФИО: {{tenantName}}</div>
+                <div>Паспорт: серия/номер {{tenantPassport}}</div>
+                <div>Выдан: {{tenantIssueDate}}, {{tenantIssuedBy}}</div>
+                <div>Код подразделения: {{tenantDivisionCode}}</div>
+                <div>Зарегистрирован(а): {{tenantRegistration}}</div>
+            </div>
+            
+            <div class="clause mt-30">
+                8.3. Все изменения и дополнения к настоящему Договору действительны лишь в том случае, если они совершены в письменной форме и подписаны обеими сторонами.
             </div>
             
             <div class="clause">
-                <p>Паспортные данные Арендатора:</p>
-                <p>ФИО: {{tenantName}}</p>
-                <p>Паспорт: {{tenantPassport}}, выдан {{tenantIssueDate}}, {{tenantIssuedBy}}, код подразделения {{tenantDivisionCode}}</p>
-                <p>Зарегистрирован(а): {{tenantRegistration}}</p>
+                8.4. Во всем остальном, что не предусмотрено настоящим Договором, стороны руководствуются действующим законодательством Российской Федерации.
             </div>
         </div>
 
-        <div class="signature-block">
+        <div class="signature-block mt-50">
             <div class="signature">
-                <p><strong>Арендодатель:</strong></p>
-                <p>___________________________</p>
-                <p>{{landlordName}}</p>
+                <div><strong>Арендодатель:</strong></div>
+                <div>___________________________</div>
+                <div>{{landlordName}}</div>
                 <div class="signature-line"></div>
-                <p>(подпись)</p>
+                <div>(подпись)</div>
             </div>
             <div class="signature">
-                <p><strong>Арендатор:</strong></p>
-                <p>___________________________</p>
-                <p>{{tenantName}}</p>
+                <div><strong>Арендатор:</strong></div>
+                <div>___________________________</div>
+                <div>{{tenantName}}</div>
                 <div class="signature-line"></div>
-                <p>(подпись)</p>
+                <div>(подпись)</div>
             </div>
         </div>
+
+        <div class="page-number">6</div>
     </div>
+    <!-- Конец страницы 6 -->
 </body>
 </html>
