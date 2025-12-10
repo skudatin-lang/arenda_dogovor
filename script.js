@@ -1,8 +1,7 @@
 // Основные переменные
 let currentStep = 1;
-let ocrText = '';
-let currentFile = null;
 let tesseractWorker = null;
+let currentFile = null;
 
 // Инициализация при загрузке
 document.addEventListener('DOMContentLoaded', function() {
@@ -16,38 +15,54 @@ document.addEventListener('DOMContentLoaded', function() {
 function initApp() {
     // Установим даты по умолчанию
     const today = new Date();
-    document.getElementById('contractDate').valueAsDate = today;
+    const nextMonth = new Date(today);
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    
+    // Форматируем даты для input type="date"
+    document.getElementById('contractStart').value = formatDateForInput(today);
+    document.getElementById('contractEnd').value = formatDateForInput(nextMonth);
     
     // Инициализируем список проживающих
     initResidents();
     
-    // Установим фокус на поле арендодателя
-    document.getElementById('landlordName').focus();
+    // Инициализируем Tesseract в фоне
+    initTesseract();
+}
+
+// Форматирование даты для input type="date"
+function formatDateForInput(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 // Настройка обработчиков событий
 function setupEventListeners() {
     // Загрузка файлов
     const fileInput = document.getElementById('fileInput');
+    const uploadArea = document.getElementById('uploadArea');
     const cameraInput = document.getElementById('cameraInput');
     
     fileInput.addEventListener('change', handleFileSelect);
     cameraInput.addEventListener('change', handleFileSelect);
     
-    // Drag & Drop для предпросмотра
-    const previewContainer = document.getElementById('previewContainer');
-    previewContainer.addEventListener('dragover', (e) => {
+    // Drag & Drop
+    uploadArea.addEventListener('dragover', (e) => {
         e.preventDefault();
-        previewContainer.style.borderColor = '#764ba2';
+        uploadArea.style.borderColor = '#764ba2';
+        uploadArea.style.background = '#e9ecef';
     });
     
-    previewContainer.addEventListener('dragleave', () => {
-        previewContainer.style.borderColor = '#dee2e6';
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.style.borderColor = '#667eea';
+        uploadArea.style.background = '#f8f9fa';
     });
     
-    previewContainer.addEventListener('drop', (e) => {
+    uploadArea.addEventListener('drop', (e) => {
         e.preventDefault();
-        previewContainer.style.borderColor = '#dee2e6';
+        uploadArea.style.borderColor = '#667eea';
+        uploadArea.style.background = '#f8f9fa';
         
         if (e.dataTransfer.files.length) {
             handleFileSelect({ target: { files: e.dataTransfer.files } });
@@ -75,8 +90,8 @@ function handleFileSelect(event) {
         return;
     }
     
-    if (file.size > 10 * 1024 * 1024) {
-        alert('Файл слишком большой. Максимальный размер: 10MB');
+    if (file.size > 5 * 1024 * 1024) {
+        alert('Файл слишком большой. Максимальный размер: 5MB');
         return;
     }
     
@@ -89,11 +104,11 @@ function handleFileSelect(event) {
         preview.src = e.target.result;
         previewContainer.style.display = 'block';
         
+        // Включить кнопку распознавания
+        document.getElementById('recognizeBtn').disabled = false;
+        
         // Прокрутить к предпросмотру
         previewContainer.scrollIntoView({ behavior: 'smooth' });
-        
-        // Автоматически запустить распознавание через 1 секунду
-        setTimeout(recognizeText, 1000);
     };
     
     reader.readAsDataURL(file);
@@ -106,48 +121,152 @@ function clearPreview() {
     document.getElementById('fileInput').value = '';
     document.getElementById('cameraInput').value = '';
     currentFile = null;
+    document.getElementById('recognizeBtn').disabled = true;
 }
 
-// Распознавание текста с паспорта
+// Инициализация Tesseract
+async function initTesseract() {
+    try {
+        console.log('Инициализация Tesseract...');
+        
+        // Используем простую инициализацию
+        tesseractWorker = await Tesseract.createWorker('rus', 1, {
+            logger: m => console.log('Tesseract:', m)
+        });
+        
+        console.log('Tesseract готов к работе');
+        
+        // Включить кнопку распознавания
+        const recognizeBtn = document.getElementById('recognizeBtn');
+        if (recognizeBtn) {
+            recognizeBtn.disabled = false;
+        }
+        
+    } catch (error) {
+        console.error('Ошибка инициализации Tesseract:', error);
+        alert('Модуль распознавания текста не загрузился. Используйте ручной ввод.');
+        
+        // Отключить кнопку распознавания
+        const recognizeBtn = document.getElementById('recognizeBtn');
+        if (recognizeBtn) {
+            recognizeBtn.disabled = true;
+            recognizeBtn.innerHTML = '<i class="fas fa-times"></i> OCR недоступен';
+        }
+    }
+}
+
+// Распознавание текста
 async function recognizeText() {
     if (!currentFile) {
         alert('Сначала загрузите фото паспорта');
         return;
     }
     
-    showLoading('Распознаем текст с паспорта...');
+    if (!tesseractWorker) {
+        alert('Модуль распознавания еще не готов. Используйте ручной ввод.');
+        goToStep(2);
+        return;
+    }
+    
+    showLoading('Распознаем текст... Это займет 10-20 секунд');
     
     try {
-        // Используем Tesseract.js v2 для лучшей совместимости
-        const worker = Tesseract.createWorker({
-            logger: m => console.log('Tesseract:', m)
-        });
-        
-        await worker.load();
-        await worker.loadLanguage('rus');
-        await worker.initialize('rus');
+        // Читаем файл как DataURL
+        const imageUrl = await readFileAsDataURL(currentFile);
         
         // Распознаем текст
-        const { data: { text } } = await worker.recognize(currentFile);
-        ocrText = text;
-        
-        await worker.terminate();
+        const result = await tesseractWorker.recognize(imageUrl);
+        const text = result.data.text;
         
         hideLoading();
         
-        // Показываем распознанный текст
-        showOCRModal(ocrText);
+        // Парсим данные из распознанного текста
+        const parsedData = parsePassportData(text);
+        
+        // Показываем модальное окно с результатами
+        showOCRResults(parsedData);
         
     } catch (error) {
         console.error('Ошибка распознавания:', error);
         hideLoading();
         alert('Не удалось распознать текст. Пожалуйста, введите данные вручную.');
+        goToStep(2);
     }
 }
 
-// Показать модальное окно с OCR результатом
-function showOCRModal(text) {
-    document.getElementById('ocrText').textContent = text;
+// Чтение файла как DataURL
+function readFileAsDataURL(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = (e) => reject(e);
+        reader.readAsDataURL(file);
+    });
+}
+
+// Парсинг данных из паспорта
+function parsePassportData(text) {
+    const result = {};
+    
+    // Очищаем текст
+    text = text.replace(/\s+/g, ' ').trim();
+    
+    // Поиск ФИО (формат: Фамилия Имя Отчество)
+    const fioMatch = text.match(/([А-ЯЁ][а-яё]+\s+[А-ЯЁ][а-яё]+\s+[А-ЯЁ][а-яё]+)/);
+    if (fioMatch) {
+        result.fullName = fioMatch[1];
+    }
+    
+    // Поиск серии и номера паспорта
+    const passportMatch = text.match(/(\d{2}\s?\d{2}\s?\d{6})/);
+    if (passportMatch) {
+        const passport = passportMatch[1].replace(/\s/g, '');
+        if (passport.length === 10) {
+            result.passport = passport.slice(0, 4) + ' ' + passport.slice(4);
+        }
+    }
+    
+    // Поиск даты выдачи (формат: ДД.ММ.ГГГГ)
+    const dateMatch = text.match(/(\d{1,2}[.\s]\d{1,2}[.\s]\d{4})/);
+    if (dateMatch) {
+        const dateStr = dateMatch[1].replace(/\s/g, '.').replace(/[^0-9.]/g, '');
+        const parts = dateStr.split('.');
+        if (parts.length === 3) {
+            const day = parts[0].padStart(2, '0');
+            const month = parts[1].padStart(2, '0');
+            const year = parts[2];
+            if (year.length === 4) {
+                result.issueDate = `${year}-${month}-${day}`;
+            }
+        }
+    }
+    
+    // Поиск кода подразделения (формат: XXX-XXX)
+    const codeMatch = text.match(/(\d{3}[-—]\d{3})/);
+    if (codeMatch) {
+        result.divisionCode = codeMatch[1];
+    }
+    
+    return result;
+}
+
+// Показать результаты OCR в модальном окне
+function showOCRResults(data) {
+    // Заполняем поля в модальном окне
+    if (data.fullName) {
+        document.getElementById('ocrFullName').value = data.fullName;
+    }
+    if (data.passport) {
+        document.getElementById('ocrPassport').value = data.passport;
+    }
+    if (data.issueDate) {
+        document.getElementById('ocrIssueDate').value = data.issueDate;
+    }
+    if (data.divisionCode) {
+        document.getElementById('ocrDivisionCode').value = data.divisionCode;
+    }
+    
+    // Показываем модальное окно
     document.getElementById('ocrModal').classList.add('active');
 }
 
@@ -156,39 +275,25 @@ function closeOCRModal() {
     document.getElementById('ocrModal').classList.remove('active');
 }
 
-// Использовать данные из OCR для заполнения формы арендатора
-function useOCRData() {
-    if (!ocrText) return;
+// Применить данные из OCR
+function applyOCRData() {
+    // Заполняем поля арендатора данными из OCR
+    const fullName = document.getElementById('ocrFullName').value;
+    const passport = document.getElementById('ocrPassport').value;
+    const issueDate = document.getElementById('ocrIssueDate').value;
+    const divisionCode = document.getElementById('ocrDivisionCode').value;
     
-    // Парсим данные из текста (упрощенная версия)
-    const lines = ocrText.split('\n');
-    
-    // Ищем ФИО (обычно самая длинная строка с русскими буквами)
-    const nameCandidates = lines.filter(line => {
-        const rusLetters = line.match(/[А-ЯЁ][а-яё]+/g);
-        return rusLetters && rusLetters.length >= 2 && line.length > 10;
-    });
-    
-    if (nameCandidates.length > 0) {
-        // Берем самый длинный вариант
-        const longestName = nameCandidates.reduce((a, b) => a.length > b.length ? a : b);
-        document.getElementById('tenantName').value = longestName.trim();
+    if (fullName) {
+        document.getElementById('tenantName').value = fullName;
     }
-    
-    // Ищем паспортные данные (формат: 4 цифры, пробел, 6 цифр)
-    const passportMatch = ocrText.match(/(\d{4}\s?\d{6})/);
-    if (passportMatch) {
-        const passport = passportMatch[1].replace(/\s/g, '');
-        if (passport.length === 10) {
-            document.getElementById('tenantPassport').value = 
-                passport.slice(0, 4) + ' ' + passport.slice(4);
-        }
+    if (passport) {
+        document.getElementById('tenantPassport').value = passport;
     }
-    
-    // Ищем код подразделения (формат: 123-456)
-    const codeMatch = ocrText.match(/(\d{3}[-]\d{3})/);
-    if (codeMatch) {
-        document.getElementById('tenantDivisionCode').value = codeMatch[1];
+    if (issueDate) {
+        document.getElementById('tenantIssueDate').value = issueDate;
+    }
+    if (divisionCode) {
+        document.getElementById('tenantDivisionCode').value = divisionCode;
     }
     
     closeOCRModal();
@@ -203,7 +308,7 @@ function skipToManual() {
 // Навигация по шагам
 function goToStep(step) {
     // Скрыть все шаги
-    document.querySelectorAll('.step-section').forEach(el => {
+    document.querySelectorAll('.step').forEach(el => {
         el.classList.remove('active');
     });
     
@@ -237,7 +342,7 @@ function updateProgress() {
 
 // Инициализация списка проживающих
 function initResidents() {
-    const residentsContainer = document.getElementById('residentsContainer');
+    const residentsList = document.getElementById('residentsList');
     const defaultResidents = [
         'Адамбаев Абат',
         'Адамбаев Джамшут',
@@ -254,22 +359,22 @@ function initResidents() {
 
 // Добавить проживающего
 function addResident(name = '') {
-    const residentsContainer = document.getElementById('residentsContainer');
+    const residentsList = document.getElementById('residentsList');
     const residentId = Date.now();
     
     const residentItem = document.createElement('div');
     residentItem.className = 'resident-item';
     residentItem.innerHTML = `
         <input type="text" placeholder="ФИО" value="${name}" 
-               class="resident-name" oninput="saveFormData()">
+               oninput="saveFormData()" class="resident-name">
         <input type="date" placeholder="Дата рождения" 
-               class="resident-birthdate" oninput="saveFormData()">
+               oninput="saveFormData()" class="resident-birthdate">
         <button type="button" class="resident-remove" onclick="removeResident(this)">
             <i class="fas fa-times"></i>
         </button>
     `;
     
-    residentsContainer.appendChild(residentItem);
+    residentsList.appendChild(residentItem);
 }
 
 // Удалить проживающего
@@ -280,93 +385,13 @@ function removeResident(button) {
     }
 }
 
-// Валидация и генерация договора
-function validateAndGenerate() {
+// Генерация договора
+async function generateContract() {
     // Проверка обязательных полей
     if (!validateForm()) {
         return;
     }
     
-    // Генерация договора
-    generateContract();
-}
-
-// Валидация формы
-function validateForm() {
-    const requiredFields = [
-        'landlordName',
-        'landlordPassport',
-        'landlordIssuedBy',
-        'landlordIssueDate',
-        'landlordDivisionCode',
-        'landlordRegistration',
-        'tenantName',
-        'tenantPassport',
-        'tenantIssuedBy',
-        'tenantIssueDate',
-        'tenantDivisionCode',
-        'tenantRegistration',
-        'apartmentAddress',
-        'apartmentArea',
-        'roomsCount',
-        'basisDocument',
-        'contractDate',
-        'rentAmount',
-        'depositAmount',
-        'contractStart',
-        'contractEnd',
-        'electricityCounter',
-        'hotWaterCounter',
-        'coldWaterCounter'
-    ];
-    
-    const errors = [];
-    
-    requiredFields.forEach(fieldId => {
-        const field = document.getElementById(fieldId);
-        if (!field.value.trim()) {
-            const label = field.previousElementSibling?.textContent || field.placeholder;
-            errors.push(label);
-            field.style.borderColor = '#dc3545';
-            
-            // Показать подсказку
-            if (!field.nextElementSibling?.classList.contains('hint')) {
-                const hint = document.createElement('div');
-                hint.className = 'hint';
-                hint.textContent = 'Это поле обязательно для заполнения';
-                hint.style.color = '#dc3545';
-                field.parentNode.appendChild(hint);
-            }
-        } else {
-            field.style.borderColor = '#e9ecef';
-            
-            // Удалить подсказку об ошибке
-            const hint = field.nextElementSibling;
-            if (hint && hint.classList.contains('hint') && hint.style.color === 'rgb(220, 53, 69)') {
-                hint.remove();
-            }
-        }
-    });
-    
-    if (errors.length > 0) {
-        alert('Пожалуйста, заполните все обязательные поля:\n\n' + 
-              errors.map(e => '• ' + e).join('\n'));
-        
-        // Прокрутить к первой ошибке
-        const firstError = document.querySelector('input[style*="border-color: rgb(220, 53, 69)"]');
-        if (firstError) {
-            firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            firstError.focus();
-        }
-        
-        return false;
-    }
-    
-    return true;
-}
-
-// Генерация договора
-async function generateContract() {
     showLoading('Формируем договор...');
     
     try {
@@ -374,7 +399,7 @@ async function generateContract() {
         const data = collectFormData();
         
         // Создаем HTML договора
-        const contractHTML = createContractHTML(data);
+        const contractHTML = generateContractHTML(data);
         
         // Отображаем договор
         document.getElementById('contractPreview').innerHTML = contractHTML;
@@ -383,12 +408,6 @@ async function generateContract() {
         setTimeout(() => {
             hideLoading();
             goToStep(3);
-            
-            // Прокрутить к началу договора
-            document.getElementById('contractPreview').scrollIntoView({ 
-                behavior: 'smooth', 
-                block: 'start' 
-            });
         }, 500);
         
     } catch (error) {
@@ -396,6 +415,370 @@ async function generateContract() {
         hideLoading();
         alert('Ошибка при формировании договора. Пожалуйста, проверьте введенные данные.');
     }
+}
+
+// Генерация HTML договора
+function generateContractHTML(data) {
+    // Создаем HTML для проживающих
+    let residentsHTML = '';
+    data.residents.forEach((resident, index) => {
+        residentsHTML += `
+            <div class="resident-line">
+                ${index + 1}. Ф.И.О., дата рождения <strong>${resident.name}</strong>${resident.birthdate ? `, ${resident.birthdate}` : ''}
+            </div>
+        `;
+    });
+    
+    // Формируем полный договор с правильной разбивкой на страницы
+    return `
+        <div class="contract-content">
+            <!-- Страница 1 -->
+            <div class="page">
+                <div class="contract-header">
+                    <div class="contract-title">Договор СК-03</div>
+                    <div class="contract-subtitle">аренды жилого помещения</div>
+                    <div class="contract-date">г. Москва «${data.currentDay}» ${data.currentMonth} ${data.currentYear} г.</div>
+                </div>
+
+                <div class="clause">
+                    Гр. <span class="underline bold">${data.landlordName}</span>, далее по тексту «Арендодатель», с одной стороны, и
+                </div>
+                <div class="clause">
+                    <span class="underline bold">${data.tenantName}</span>, именуемый в дальнейшем «Арендатор», заключили настоящий Договор о нижеследующем:
+                </div>
+
+                <div class="section">
+                    <div class="section-title">1. ПРЕДМЕТ ДОГОВОРА</div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">1.1.</span> Арендодатель за плату предоставляет Арендатору в аренду жилое помещение:
+                        <div class="indent bold">
+                            «Квартира» общей площадью ${data.apartmentArea} кв.м., состоящее из ${data.roomsCount} комнат, расположенное по адресу: ${data.apartmentAddress}
+                        </div>
+                        телефон отсутствует
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">1.2.</span> Арендодатель является собственником жилого помещения на основании документов: ${data.basisDocument}
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">1.3.</span> Арендодатель подтверждает, что на момент подписания настоящего Договора указанное жилое помещение не продано, не подарено, не находится под залогом, не обременено другими договорами на срок аренды по настоящему Договору, в споре или под арестом не состоит, а также не отягощено другими обязательствами по отношению к третьим лицам, и к нему не существует претензий третьих лиц. Арендодатель гарантирует получение согласия всех совершеннолетних лиц, совместно с ним владеющих жилым помещением, на сдачу данного жилого помещения в аренду.
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">1.4.</span> Срок аренды определяется <span class="bold">с ${data.contractStart} по ${data.contractEnd}</span> с пролонгацией по взаимному письменному согласию сторон.
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">1.5.</span> В жилом помещении имеют право проживать лица, указанные в п.5 настоящего Договора.
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">1.6.</span> Передача жилого помещения будет удостоверена обеими сторонами путем подписания акта приема-передачи жилого помещения по форме, указанной в Приложении № 1.
+                    </div>
+                </div>
+                
+                <div class="page-number">1</div>
+            </div>
+
+            <!-- Страница 2 -->
+            <div class="page">
+                <div class="section">
+                    <div class="section-title">2. ПОРЯДОК ОПЛАТЫ ЖИЛОГО ПОМЕЩЕНИЯ</div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">2.1.</span> Размер оплаты за аренду жилого помещения устанавливается по соглашению сторон и составляет
+                        <div class="indent bold">${data.rentAmount} (${data.rentAmountWords}) рублей в месяц.</div>
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">2.2.</span> Одностороннее изменение размера платы за аренду жилого помещения в течение всего срока действия Договора не допускается.
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">2.3.</span> Оплата производится в следующем порядке:
+                        <div class="indent">
+                            <span class="clause-number">2.3.1.</span> При подписании данного Договора Арендодатель получает от Арендатора в качестве оплаты за аренду жилого помещения за 1 (один) месяц сумму, составляющую <span class="bold">${data.rentAmount} (${data.rentAmountWords})</span> рублей, а также сумму, составляющую <span class="bold">${data.rentAmount} (${data.rentAmountWords})</span> рублей в качестве оплаты за прошедший месяц.
+                        </div>
+                        <div class="indent">
+                            <span class="clause-number">2.3.2.</span> Дальнейшая оплата производится (помесячно, поквартально) помесячно регулярно «31» числа, не позднее «01» числа.
+                        </div>
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">2.4.</span> Факт осуществления платежей по настоящему Договору подтверждается Арендодателем путем выдачи расписок или чеков в получении денежных сумм от Арендатора или посредством заполнения графика платежей по Приложению № 3.
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">2.5.</span> Электроэнергию оплачивает <span class="bold">Арендатор</span> (Арендодатель / Арендатор). Показания счетчика на дату передачи помещения в найм: <span class="underline">${data.electricityCounter}</span>.
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">2.6.</span> Коммунальные услуги оплачивает <span class="bold">Арендатор</span> (Арендодатель / Арендатор).
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">2.7.</span> Абонентскую плату за интернет оплачивает <span class="bold">Арендатор</span> (Арендодатель / Арендатор).
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">2.8.</span> В случае наличия счетчиков горячей и холодной воды оплату за воду производит <span class="bold">Арендатор</span> (Арендодатель / Арендатор). Показания счетчиков на дату передачи помещения в найм: горячей воды <span class="underline">${data.hotWaterCounter}</span>, холодной воды <span class="underline">${data.coldWaterCounter}</span>.
+                    </div>
+                </div>
+                
+                <div class="signature-block">
+                    <div class="signature">
+                        <div>Арендодатель:</div>
+                        <div class="signature-line"></div>
+                        <div>(подпись)</div>
+                    </div>
+                    <div class="signature">
+                        <div>Арендатор:</div>
+                        <div class="signature-line"></div>
+                        <div>(подпись)</div>
+                    </div>
+                </div>
+                
+                <div class="page-number">2</div>
+            </div>
+
+            <!-- Страница 3 -->
+            <div class="page">
+                <div class="clause">
+                    <span class="clause-number">2.9.</span> С целью материального подтверждения обязательств по п.п. 4.2. и 4.3. настоящего Договора Арендатор передает Арендодателю страховой депозит в размере: <span class="bold">${data.depositAmount} (${data.depositAmountWords})</span> рублей.
+                </div>
+                
+                <div class="clause">
+                    <span class="clause-number">2.10.</span> По окончанию срока аренды, после передачи жилого помещения Арендатором Арендодателю и подтверждения отсутствия задолженности по междугородним телефонным переговорам, Арендодатель возвращает хранящийся у него страховой депозит за вычетом сумм, пошедших на оплату телефонных переговоров или других выплат согласно настоящему Договору.
+                </div>
+
+                <div class="section">
+                    <div class="section-title">3. ПРАВА И ОБЯЗАННОСТИ АРЕНДОДАТЕЛЯ</div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">3.1.</span> Арендодатель обязан передать Арендатору жилое помещение, свободное от проживания в нем каких бы то ни было лиц, в состоянии, пригодном для проживания, а также с установленным в нем оборудованием, мебелью, иным имуществом (в случае наличия перечисленного), что отражается в Приложении № 1 к данному Договору, в исправном состоянии не позднее <span class="bold">${data.contractStart}</span>.
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">3.2.</span> Арендодатель не в праве чинить препятствия Арендатору в правомерном пользовании жилым помещением.
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">3.3.</span> Арендодатель в праве посещать сданное им в наем жилое помещение и производить его внешний осмотр в присутствии Арендатора по предварительному с ним соглашению, но не чаще <span class="bold">2 (двух)</span> раз в месяц.
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">3.4.</span> Арендодатель обязан осуществлять техобслуживание жилого помещения и оборудования в нем. Если Арендодатель окажется не в состоянии организовать необходимые ремонтные работы, Арендатор имеет право с письменного разрешения Арендодателя нанять третье лицо для выполнения таких работ или выполнить эти работы самостоятельно (по выбору Арендодателя) за цену, согласованную с Арендодателем с последующим вычетом стоимости таких работ из оплаты за аренду. В случае если неисправность или поломка любого из элементов или технических систем произошли по вине Арендатора, работы по устранению неисправностей и приведению жилого помещения в надлежащее состояние будут организованы и выполнены или Арендатором за свой счет, или Арендодателем за счет Арендатора (по выбору Арендатора).
+                    </div>
+                </div>
+                
+                <div class="page-number">3</div>
+            </div>
+
+            <!-- Страница 4 -->
+            <div class="page">
+                <div class="clause">
+                    <span class="clause-number">3.5.</span> Арендодатель не несет ответственности за действия Арендатора и за действия граждан, проживающих по п.5, перед третьими лицами за возможный ущерб, нанесенный третьим лицам по вине Арендатора.
+                </div>
+                
+                <div class="clause">
+                    <span class="clause-number">3.6.</span> В случае нанесения ущерба по вине Арендатора жилому помещению, мебели, оборудованию и иному имуществу, Арендодатель имеет право удержать согласованную с Арендатором в письменной форме сумму ущерба из страхового депозита.
+                </div>
+                
+                <div class="clause">
+                    <span class="clause-number">3.7.</span> Ущерб жилому помещению, мебели, оборудованию и иному имуществу Арендодателя, нанесенный Арендатором, фиксируется сторонами в акте сдачи-приемки, подписываемом в соответствии с положением п. 4.10 настоящего Договора. В случае разногласий относительно факта причинения ущерба и его размера сторонами может быть назначена независимая экспертиза.
+                </div>
+
+                <div class="section">
+                    <div class="section-title">4. ПРАВА И ОБЯЗАННОСТИ АРЕНДАТОРА</div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">4.1.</span> Арендатор обязан использовать жилое помещение только для проживания.
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">4.2.</span> Арендатор обязан своевременно производить оплату Арендодателю за аренду жилого помещения в сроки и в порядке, установленным Договором, а также оплачивать счета за междугородние телефонные переговоры.
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">4.3.</span> Арендатор обязан обеспечивать сохранность жилого помещения, установленного в нем оборудования, мебели и иного имущества и поддерживать их в надлежащем состоянии.
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">4.4.</span> Арендатор обязан соблюдать нормы и правила пользования жилым помещением, в том числе правила пожарной безопасности и электробезопасности.
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">4.5.</span> Арендатор обязан своевременно и полно информировать Арендодателя по всем вопросам и обстоятельствам, имеющим отношение к жилому помещению, а также о получении почтовой корреспонденции, извещений и уведомлений в адрес Арендодателя.
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">4.6.</span> Арендатор обязан освободить жилое помещение по истечении срока найма.
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">4.7.</span> Арендатор не в праве заключать договора субаренды жилого помещения.
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">4.8.</span> Арендатор не в праве заводить домашних животных в жилом помещении без письменного на то разрешения со стороны Арендодателя.
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">4.9.</span> Арендатор не в праве производить переустройство и реконструкцию жилого помещения. Проводить ремонтные работы или осуществлять какие-либо изменения в жилом помещении Арендатор вправе только с письменного на то разрешения со стороны Арендодателя.
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">4.10.</span> Арендатор обязан по окончании срока аренды или в случае досрочного расторжения Договора вернуть Арендодателю в исправном состоянии с учетом естественного износа жилое помещение, установленное в нем оборудование, мебель и иное имущество, полученные им в соответствии с актом приема-передачи по Приложению № 1 путем оформления акта сдачи-приемки по Приложению № 2.
+                    </div>
+                </div>
+                
+                <div class="signature-block">
+                    <div class="signature">
+                        <div>Арендодатель:</div>
+                        <div class="signature-line"></div>
+                        <div>(подпись)</div>
+                    </div>
+                    <div class="signature">
+                        <div>Арендатор:</div>
+                        <div class="signature-line"></div>
+                        <div>(подпись)</div>
+                    </div>
+                </div>
+                
+                <div class="page-number">4</div>
+            </div>
+
+            <!-- Страница 5 -->
+            <div class="page">
+                <div class="section">
+                    <div class="section-title">5. ЛИЦА, ИМЕЮЩИЕ ПРАВО ПРОЖИВАТЬ В ЖИЛОМ ПОМЕЩЕНИИ</div>
+                    
+                    <div class="clause">
+                        Стороны договорились, что в жилом помещении могут проживать следующие лица:
+                    </div>
+                    
+                    <div class="indent">
+                        ${residentsHTML}
+                    </div>
+
+                    <div class="section">
+                        <div class="section-title">6. ОТВЕТСТВЕННОСТИ СТОРОН</div>
+                        
+                        <div class="clause">
+                            <span class="clause-number">6.1.</span> За неисполнение или ненадлежащее исполнение условий данного Договора стороны несут ответственность в соответствии с действующим Законодательством РФ.
+                        </div>
+                        
+                        <div class="clause">
+                            <span class="clause-number">6.2.</span> Арендатор несет ответственность за соблюдение норм поведения в жилом помещении и за действия граждан, постоянно в нем проживающих, которые нарушают условия данного Договора.
+                        </div>
+                        
+                        <div class="clause">
+                            <span class="clause-number">6.3.</span> Ликвидация последствий аварий, произошедших по вине Арендатора, производится за счет Арендатора.
+                        </div>
+                        
+                        <div class="clause">
+                            <span class="clause-number">6.4.</span> Арендатор возмещает материальный ущерб, причиненный имуществу, указанному в Приложении № 1.
+                        </div>
+                        
+                        <div class="clause">
+                            <span class="clause-number">6.5.</span> Арендатор не несет ответственность за естественную амортизацию жилого помещения, установленного в нем оборудования, мебели и иного имущества.
+                        </div>
+                        
+                        <div class="clause">
+                            <span class="clause-number">6.6.</span> Арендатор несет полную материальную ответственность за ущерб жилому помещению, установленному в нем оборудованию, мебели и иному имуществу, а также прилегающим помещениям, нанесенный по вине или грубой неосторожности Арендатора и/или лиц по п.5, его гостей, а также домашних животных.
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="page-number">5</div>
+            </div>
+
+            <!-- Страница 6 -->
+            <div class="page">
+                <div class="section">
+                    <div class="section-title">7. РАСТОРЖЕНИЕ ДОГОВОРА АРЕНДЫ ЖИЛОГО ПОМЕЩЕНИЯ</div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">7.1.</span> Договор может быть расторгнут по взаимному согласию сторон с письменным предупреждением за 30 (тридцать) дней до предполагаемой даты расторжения Договора.
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">7.2.</span> Данный Договор может быть расторгнут по требованию Арендодателя в следующих случаях:
+                        <div class="indent">
+                            <span class="clause-number">7.2.1.</span> При несоблюдении Арендатором условий данного Договора.
+                        </div>
+                        <div class="indent">
+                            <span class="clause-number">7.2.2.</span> При просрочке оплаты за аренду Арендатором более чем на один день.
+                        </div>
+                        <div class="indent">
+                            <span class="clause-number">7.2.3.</span> При разрушении или порче жилого помещения, в случае причинения существенных убытков установленному в нем оборудованию, мебели и иному имуществу Арендатором или другими гражданами, за действия которых он отвечает.
+                        </div>
+                        <div class="indent">
+                            <span class="clause-number">7.2.4.</span> Если Арендатор или другие граждане, за действия которых он отвечает, используют жилое помещение не по назначению или нарушают права и интересы соседей.
+                        </div>
+                        <div class="indent">
+                            <span class="clause-number">7.2.5.</span> В случае досрочного расторжения настоящего Договора по вине или инициативе Арендатора страховой депозит ему не возвращается.
+                        </div>
+                    </div>
+                    
+                    <div class="clause">
+                        <span class="clause-number">7.3.</span> Настоящий Договор может быть расторгнут по требованию любой из сторон в случае, если жилое помещение перестанет быть пригодным для постоянного проживания, а также в случае его аварийного состояния (по заключению РЭУ).
+                    </div>
+
+                    <div class="section">
+                        <div class="section-title">8. ПРОЧИЕ УСЛОВИЯ</div>
+                        
+                        <div class="clause">
+                            8.1. Договор составлен в двух экземплярах, имеющих одинаковую юридическую силу, по одному экземпляру для каждой из сторон.
+                        </div>
+                        
+                        <div class="clause">
+                            8.2. Паспортные данные сторон:
+                        </div>
+                        
+                        <div class="passport-data">
+                            <div class="bold">АРЕНДОДАТЕЛЬ:</div>
+                            <div>ФИО: ${data.landlordName}</div>
+                            <div>Паспорт: ${data.landlordPassport}</div>
+                            <div>Выдан: ${data.landlordIssueDate}, ${data.landlordIssuedBy}</div>
+                            <div>Код подразделения: ${data.landlordDivisionCode}</div>
+                            <div>Зарегистрирован(а): ${data.landlordRegistration}</div>
+                        </div>
+                        
+                        <div class="passport-data">
+                            <div class="bold">АРЕНДАТОР:</div>
+                            <div>ФИО: ${data.tenantName}</div>
+                            <div>Паспорт: ${data.tenantPassport}</div>
+                            <div>Выдан: ${data.tenantIssueDate}, ${data.tenantIssuedBy}</div>
+                            <div>Код подразделения: ${data.tenantDivisionCode}</div>
+                            <div>Зарегистрирован(а): ${data.tenantRegistration}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="signature-block">
+                        <div class="signature">
+                            <div><strong>Арендодатель:</strong></div>
+                            <div>___________________________</div>
+                            <div>${data.landlordName}</div>
+                            <div class="signature-line"></div>
+                            <div>(подпись)</div>
+                        </div>
+                        <div class="signature">
+                            <div><strong>Арендатор:</strong></div>
+                            <div>___________________________</div>
+                            <div>${data.tenantName}</div>
+                            <div class="signature-line"></div>
+                            <div>(подпись)</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="page-number">6</div>
+            </div>
+        </div>
+    `;
 }
 
 // Сбор данных формы
@@ -408,22 +791,20 @@ function collectFormData() {
         if (name.trim()) {
             residents.push({
                 name: name.trim(),
-                birthdate: birthdate ? formatDate(birthdate) : ''
+                birthdate: birthdate ? formatDateRU(new Date(birthdate)) : ''
             });
         }
     });
     
     // Форматирование дат для договора
-    const formatDateRU = (dateStr) => {
-        if (!dateStr) return '';
-        const date = new Date(dateStr);
+    const formatDateRU = (date) => {
         const day = date.getDate().toString().padStart(2, '0');
         const month = date.toLocaleDateString('ru-RU', { month: 'long' });
         const year = date.getFullYear();
         return `${day} ${month} ${year} г.`;
     };
     
-    // Форматирование дат для паспорта (кратко)
+    // Форматирование дат для паспортных данных
     const formatDateShort = (dateStr) => {
         if (!dateStr) return '';
         const date = new Date(dateStr);
@@ -439,20 +820,21 @@ function collectFormData() {
         const teens = ['десять', 'одиннадцать', 'двенадцать', 'тринадцать', 'четырнадцать', 'пятнадцать', 'шестнадцать', 'семнадцать', 'восемнадцать', 'девятнадцать'];
         const tens = ['', '', 'двадцать', 'тридцать', 'сорок', 'пятьдесят', 'шестьдесят', 'семьдесят', 'восемьдесят', 'девяносто'];
         const hundreds = ['', 'сто', 'двести', 'триста', 'четыреста', 'пятьсот', 'шестьсот', 'семьсот', 'восемьсот', 'девятьсот'];
+        const thousands = ['тысяч', 'тысяча', 'тысячи', 'тысячи', 'тысячи', 'тысяч', 'тысяч', 'тысяч', 'тысяч', 'тысяч'];
         
         let result = '';
         let n = parseInt(num);
         
-        if (n === 0) return 'ноль';
+        if (isNaN(n) || n === 0) return 'ноль';
         
         // Тысячи
         if (n >= 1000) {
-            const thousands = Math.floor(n / 1000);
+            const th = Math.floor(n / 1000);
+            if (th === 1) result += 'одна тысяча ';
+            else if (th === 2) result += 'две тысячи ';
+            else if (th < 5) result += numberToWords(th) + ' тысячи ';
+            else result += numberToWords(th) + ' тысяч ';
             n %= 1000;
-            if (thousands === 1) result += 'одна тысяча ';
-            else if (thousands === 2) result += 'две тысячи ';
-            else if (thousands < 5) result += numberToWords(thousands) + ' тысячи ';
-            else result += numberToWords(thousands) + ' тысяч ';
         }
         
         // Сотни
@@ -462,7 +844,7 @@ function collectFormData() {
             n %= 100;
         }
         
-        // Десятки
+        // Десятки и единицы
         if (n >= 20) {
             const t = Math.floor(n / 10);
             result += tens[t] + ' ';
@@ -472,7 +854,6 @@ function collectFormData() {
             n = 0;
         }
         
-        // Единицы
         if (n > 0) {
             result += units[n] + ' ';
         }
@@ -480,11 +861,7 @@ function collectFormData() {
         return result.trim() + ' рублей';
     };
     
-    // Получаем день из даты договора
-    const contractDate = new Date(document.getElementById('contractDate').value);
-    const contractDay = contractDate.getDate().toString().padStart(2, '0');
-    const contractMonth = contractDate.toLocaleDateString('ru-RU', { month: 'long' });
-    const contractYear = contractDate.getFullYear();
+    const currentDate = new Date();
     
     return {
         // Арендодатель
@@ -509,464 +886,157 @@ function collectFormData() {
         roomsCount: document.getElementById('roomsCount').value,
         basisDocument: document.getElementById('basisDocument').value,
         
-        // Условия аренды
+        // Условия
         rentAmount: document.getElementById('rentAmount').value,
         rentAmountWords: numberToWords(document.getElementById('rentAmount').value),
         depositAmount: document.getElementById('depositAmount').value,
         depositAmountWords: numberToWords(document.getElementById('depositAmount').value),
-        contractStart: formatDateRU(document.getElementById('contractStart').value),
-        contractEnd: formatDateRU(document.getElementById('contractEnd').value),
+        contractStart: formatDateRU(new Date(document.getElementById('contractStart').value)),
+        contractEnd: formatDateRU(new Date(document.getElementById('contractEnd').value)),
         
         // Счетчики
-        electricityCounter: document.getElementById('electricityCounter').value,
-        hotWaterCounter: document.getElementById('hotWaterCounter').value,
-        coldWaterCounter: document.getElementById('coldWaterCounter').value,
+        electricityCounter: document.getElementById('electricityCounter').value || '_________',
+        hotWaterCounter: document.getElementById('hotWaterCounter').value || '_________',
+        coldWaterCounter: document.getElementById('coldWaterCounter').value || '_________',
         
         // Проживающие
         residents: residents,
-        residentsList: residents.map(r => `${r.name}${r.birthdate ? `, ${r.birthdate}` : ''}`).join('\n'),
         
-        // Дата договора
-        contractDay: contractDay,
-        contractMonth: contractMonth,
-        contractYear: contractYear,
-        
-        // Полная текущая дата
-        currentDate: formatDateRU(document.getElementById('contractDate').value)
+        // Текущая дата
+        currentDay: currentDate.getDate().toString().padStart(2, '0'),
+        currentMonth: currentDate.toLocaleDateString('ru-RU', { month: 'long' }),
+        currentYear: currentDate.getFullYear(),
+        currentDate: formatDateRU(currentDate)
     };
 }
 
-// Создание HTML договора с правильной разбивкой на страницы
-function createContractHTML(data) {
-    // Создаем HTML для списка проживающих
-    let residentsHTML = '';
-    if (data.residents && data.residents.length > 0) {
-        residentsHTML = data.residents.map((resident, index) => 
-            `<p>${index + 1}. Ф.И.О., дата рождения <strong>${resident.name}</strong>${resident.birthdate ? `, ${resident.birthdate}` : ''}</p>`
-        ).join('');
+// Валидация формы
+function validateForm() {
+    const requiredFields = [
+        'landlordName',
+        'landlordPassport',
+        'landlordIssuedBy',
+        'landlordIssueDate',
+        'landlordDivisionCode',
+        'landlordRegistration',
+        'tenantName',
+        'tenantPassport',
+        'tenantIssuedBy',
+        'tenantIssueDate',
+        'tenantDivisionCode',
+        'tenantRegistration',
+        'apartmentAddress',
+        'apartmentArea',
+        'roomsCount',
+        'basisDocument',
+        'rentAmount',
+        'depositAmount',
+        'contractStart',
+        'contractEnd',
+        'electricityCounter',
+        'hotWaterCounter',
+        'coldWaterCounter'
+    ];
+    
+    const errors = [];
+    
+    requiredFields.forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (!field || !field.value.trim()) {
+            const label = field.previousElementSibling ? field.previousElementSibling.textContent : field.placeholder;
+            errors.push(label);
+            if (field) {
+                field.style.borderColor = '#dc3545';
+            }
+        } else if (field) {
+            field.style.borderColor = '';
+        }
+    });
+    
+    // Проверка проживающих
+    const residents = document.querySelectorAll('.resident-name');
+    let hasResidents = false;
+    residents.forEach(resident => {
+        if (resident.value.trim()) {
+            hasResidents = true;
+        }
+    });
+    
+    if (!hasResidents) {
+        errors.push('Хотя бы один проживающий');
     }
     
-    // Заменяем плейсхолдеры в данных
-    let html = `
-        <!-- Страница 1 -->
-        <div class="page">
-            <div style="text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #000;">
-                <div style="font-size: 14pt; font-weight: bold; text-transform: uppercase; margin-bottom: 10px;">Договор СК-03</div>
-                <div style="font-size: 12pt; margin-bottom: 5px;">аренды жилого помещения</div>
-                <div style="font-size: 12pt; margin-top: 15px;">г. Москва «${data.contractDay}» ${data.contractMonth} ${data.contractYear} г.</div>
-            </div>
-
-            <div style="margin-bottom: 25px;">
-                <p>Гр. <strong>${data.landlordName}</strong>, далее по тексту «Арендодатель», с одной стороны, и</p>
-                <p><strong>${data.tenantName}</strong>, именуемый в дальнейшем «Арендатор», заключили настоящий Договор о нижеследующем:</p>
-            </div>
-
-            <div style="margin: 25px 0;">
-                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 15px; font-size: 12pt;">1. ПРЕДМЕТ ДОГОВОРА</div>
-                
-                <div style="margin-bottom: 15px; text-align: justify;">
-                    <span style="font-weight: bold;">1.1.</span> Арендодатель за плату предоставляет Арендатору в аренду жилое помещение:
-                    <div style="margin-left: 20px; margin-top: 10px; margin-bottom: 10px; font-weight: bold;">
-                        «Квартира» общей площадью ${data.apartmentArea} кв.м., состоящее из ${data.roomsCount} комнат, расположенное по адресу: ${data.apartmentAddress}
-                    </div>
-                    телефон отсутствует
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">1.2.</span> Арендодатель является собственником жилого помещения на основании документов: ${data.basisDocument}
-                </div>
-                
-                <div style="margin-bottom: 15px; text-align: justify;">
-                    <span style="font-weight: bold;">1.3.</span> Арендодатель подтверждает, что на момент подписания настоящего Договора указанное жилое помещение не продано, не подарено, не находится под залогом, не обременено другими договорами на срок аренды по настоящему Договору, в споре или под арестом не состоит, а также не отягощено другими обязательствами по отношению к третьим лицам, и к нему не существует претензий третьих лиц. Арендодатель гарантирует получение согласия всех совершеннолетних лиц, совместно с ним владеющих жилым помещением, на сдачу данного жилого помещения в аренду.
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">1.4.</span> Срок аренды определяется <strong>с ${data.contractStart} по ${data.contractEnd}</strong> с пролонгацией по взаимному письменному согласию сторон.
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">1.5.</span> В жилом помещении имеют право проживать лица, указанные в п.5 настоящего Договора.
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">1.6.</span> Передача жилого помещения будет удостоверена обеими сторонами путем подписания акта приема-передачи жилого помещения по форме, указанной в Приложении № 1.
-                </div>
-            </div>
-            
-            <div style="margin-top: 50px; font-size: 10pt; color: #666; text-align: right;">Страница 1</div>
-        </div>
-
-        <!-- Страница 2 -->
-        <div class="page">
-            <div style="margin: 25px 0;">
-                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 15px; font-size: 12pt;">2. ПОРЯДОК ОПЛАТЫ ЖИЛОГО ПОМЕЩЕНИЯ</div>
-                
-                <div style="margin-bottom: 15px; text-align: justify;">
-                    <span style="font-weight: bold;">2.1.</span> Размер оплаты за аренду жилого помещения устанавливается по соглашению сторон и составляет
-                    <div style="margin-left: 20px; margin-top: 10px; margin-bottom: 10px; font-weight: bold;">
-                        ${data.rentAmount} (${data.rentAmountWords}) рублей в месяц.
-                    </div>
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">2.2.</span> Одностороннее изменение размера платы за аренду жилого помещения в течение всего срока действия Договора не допускается.
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">2.3.</span> Оплата производится в следующем порядке:
-                    <div style="margin-left: 20px; margin-top: 10px;">
-                        <span style="font-weight: bold;">2.3.1.</span> При подписании данного Договора Арендодатель получает от Арендатора в качестве оплаты за аренду жилого помещения за 1 (один) месяц сумму, составляющую <strong>${data.rentAmount} (${data.rentAmountWords})</strong> рублей, а также сумму, составляющую <strong>${data.rentAmount} (${data.rentAmountWords})</strong> рублей в качестве оплаты за прошедший месяц.
-                    </div>
-                    <div style="margin-left: 20px; margin-top: 10px;">
-                        <span style="font-weight: bold;">2.3.2.</span> Дальнейшая оплата производится (помесячно, поквартально) помесячно регулярно «31» числа, не позднее «01» числа.
-                    </div>
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">2.4.</span> Факт осуществления платежей по настоящему Договору подтверждается Арендодателем путем выдачи расписок или чеков в получении денежных сумм от Арендатора или посредством заполнения графика платежей по Приложению № 3.
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">2.5.</span> Электроэнергию оплачивает <strong>Арендатор</strong> (Арендодатель / Арендатор). Показания счетчика на дату передачи помещения в найм: <strong>${data.electricityCounter}</strong>.
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">2.6.</span> Коммунальные услуги оплачивает <strong>Арендатор</strong> (Арендодатель / Арендатор).
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">2.7.</span> Абонентскую плату за интернет оплачивает <strong>Арендатор</strong> (Арендодатель / Арендатор).
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">2.8.</span> В случае наличия счетчиков горячей и холодной воды оплату за воду производит <strong>Арендатор</strong> (Арендодатель / Арендатор). Показания счетчиков на дату передачи помещения в найм: горячей воды <strong>${data.hotWaterCounter}</strong>, холодной воды <strong>${data.coldWaterCounter}</strong>.
-                </div>
-            </div>
-            
-            <div style="margin-top: 50px; font-size: 10pt; color: #666; text-align: right;">Страница 2</div>
-        </div>
-
-        <!-- Страница 3 -->
-        <div class="page">
-            <div style="margin: 25px 0;">
-                <div style="font-weight: bold; margin-bottom: 40px; text-align: center;">
-                    Арендодатель: _______________________   Арендатор: _______________________
-                    <div style="font-weight: normal; font-size: 11pt; margin-top: 5px;">(подпись)</div>
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">2.9.</span> С целью материального подтверждения обязательств по п.п. 4.2. и 4.3. настоящего Договора Арендатор передает Арендодателю страховой депозит в размере: <strong>${data.depositAmount} (${data.depositAmountWords})</strong> рублей.
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">2.10.</span> По окончанию срока аренды, после передачи жилого помещения Арендатором Арендодателю и подтверждения отсутствия задолженности по междугородним телефонным переговорам, Арендодатель возвращает хранящийся у него страховой депозит за вычетом сумм, пошедших на оплату телефонных переговоров или других выплат согласно настоящему Договору.
-                </div>
-            </div>
-
-            <div style="margin: 25px 0;">
-                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 15px; font-size: 12pt;">3. ПРАВА И ОБЯЗАННОСТИ АРЕНДОДАТЕЛЯ</div>
-                
-                <div style="margin-bottom: 15px; text-align: justify;">
-                    <span style="font-weight: bold;">3.1.</span> Арендодатель обязан передать Арендатору жилое помещение, свободное от проживания в нем каких бы то ни было лиц, в состоянии, пригодном для проживания, а также с установленным в нем оборудованием, мебелью, иным имуществом (в случае наличия перечисленного), что отражается в Приложении № 1 к данному Договору, в исправном состоянии не позднее <strong>${data.contractStart}</strong>.
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">3.2.</span> Арендодатель не в праве чинить препятствия Арендатору в правомерном пользовании жилым помещением.
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">3.3.</span> Арендодатель в праве посещать сданное им в наем жилое помещение и производить его внешний осмотр в присутствии Арендатора по предварительному с ним соглашению, но не чаще <strong>2 (двух)</strong> раз в месяц.
-                </div>
-                
-                <div style="margin-bottom: 15px; text-align: justify;">
-                    <span style="font-weight: bold;">3.4.</span> Арендодатель обязан осуществлять техобслуживание жилого помещения и оборудования в нем. Если Арендодатель окажется не в состоянии организовать необходимые ремонтные работы, Арендатор имеет право с письменного разрешения Арендодателя нанять третье лицо для выполнения таких работ или выполнить эти работы самостоятельно (по выбору Арендодателя) за цену, согласованную с Арендодателем с последующим вычетом стоимости таких работ из оплаты за аренду. В случае если неисправность или поломка любого из элементов или технических систем произошли по вине Арендатора, работы по устранению неисправностей и приведению жилого помещения в надлежащее состояние будут организованы и выполнены или Арендатором за свой счет, или Арендодателем за счет Арендатора (по выбору Арендатора).
-                </div>
-            </div>
-            
-            <div style="margin-top: 50px; font-size: 10pt; color: #666; text-align: right;">Страница 3</div>
-        </div>
-
-        <!-- Страница 4 -->
-        <div class="page">
-            <div style="margin: 25px 0;">
-                <div style="margin-bottom: 15px; text-align: justify;">
-                    <span style="font-weight: bold;">3.5.</span> Арендодатель не несет ответственности за действия Арендатора и за действия граждан, проживающих по п.5, перед третьими лицами за возможный ущерб, нанесенный третьим лицам по вине Арендатора.
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">3.6.</span> В случае нанесения ущерба по вине Арендатора жилому помещению, мебели, оборудованию и иному имуществу, Арендодатель имеет право удержать согласованную с Арендатором в письменной форме сумму ущерба из страхового депозита.
-                </div>
-                
-                <div style="margin-bottom: 15px; text-align: justify;">
-                    <span style="font-weight: bold;">3.7.</span> Ущерб жилому помещению, мебели, оборудованию и иному имуществу Арендодателя, нанесенный Арендатором, фиксируется сторонами в акте сдачи-приемки, подписываемом в соответствии с положением п. 4.10 настоящего Договора. В случае разногласий относительно факта причинения ущерба и его размера сторонами может быть назначена независимая экспертиза.
-                </div>
-            </div>
-
-            <div style="margin: 25px 0;">
-                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 15px; font-size: 12pt;">4. ПРАВА И ОБЯЗАННОСТИ АРЕНДАТОРА</div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">4.1.</span> Арендатор обязан использовать жилое помещение только для проживания.
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">4.2.</span> Арендатор обязан своевременно производить оплату Арендодателю за аренду жилого помещения в сроки и в порядке, установленным Договором, а также оплачивать счета за междугородние телефонные переговоры.
-                </div>
-                
-                <div style="margin-bottom: 15px; text-align: justify;">
-                    <span style="font-weight: bold;">4.3.</span> Арендатор обязан обеспечивать сохранность жилого помещения, установленного в нем оборудования, мебели и иного имущества и поддерживать их в надлежащем состоянии.
-                </div>
-                
-                <div style="margin-bottom: 15px; text-align: justify;">
-                    <span style="font-weight: bold;">4.4.</span> Арендатор обязан соблюдать нормы и правила пользования жилым помещением, в том числе правила пожарной безопасности и электробезопасности.
-                </div>
-                
-                <div style="margin-bottom: 15px; text-align: justify;">
-                    <span style="font-weight: bold;">4.5.</span> Арендатор обязан своевременно и полно информировать Арендодателя по всем вопросам и обстоятельствам, имеющим отношение к жилому помещению, а также о получении почтовой корреспонденции, извещений и уведомлений в адрес Арендодателя.
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">4.6.</span> Арендатор обязан освободить жилое помещение по истечении срока найма.
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">4.7.</span> Арендатор не в праве заключать договора субаренды жилого помещения.
-                </div>
-            </div>
-            
-            <div style="margin-top: 50px; font-size: 10pt; color: #666; text-align: right;">Страница 4</div>
-        </div>
-
-        <!-- Страница 5 -->
-        <div class="page">
-            <div style="margin: 25px 0;">
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">4.8.</span> Арендатор не в праве заводить домашних животных в жилом помещении без письменного на то разрешения со стороны Арендодателя.
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">4.9.</span> Арендатор не в праве производить переустройство и реконструкцию жилого помещения. Проводить ремонтные работы или осуществлять какие-либо изменения в жилом помещении Арендатор вправе только с письменного на то разрешения со стороны Арендодателя.
-                </div>
-                
-                <div style="margin-bottom: 15px; text-align: justify;">
-                    <span style="font-weight: bold;">4.10.</span> Арендатор обязан по окончании срока аренды или в случае досрочного расторжения Договора вернуть Арендодателю в исправном состоянии с учетом естественного износа жилое помещение, установленное в нем оборудование, мебель и иное имущество, полученные им в соответствии с актом приема-передачи по Приложению № 1 путем оформления акта сдачи-приемки по Приложению № 2.
-                </div>
-                
-                <div style="font-weight: bold; margin: 40px 0; text-align: center;">
-                    Арендодатель: _______________________   Арендатор: _______________________
-                    <div style="font-weight: normal; font-size: 11pt; margin-top: 5px;">(подпись)</div>
-                </div>
-            </div>
-
-            <div style="margin: 25px 0;">
-                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 15px; font-size: 12pt;">5. ЛИЦА, ИМЕЮЩИЕ ПРАВО ПРОЖИВАТЬ В ЖИЛОМ ПОМЕЩЕНИИ</div>
-                
-                <div style="margin-bottom: 15px;">
-                    Стороны договорились, что в жилом помещении могут проживать следующие лица:
-                </div>
-                
-                <div style="margin-left: 20px;">
-                    ${residentsHTML}
-                </div>
-            </div>
-            
-            <div style="margin-top: 50px; font-size: 10pt; color: #666; text-align: right;">Страница 5</div>
-        </div>
-
-        <!-- Страница 6 -->
-        <div class="page">
-            <div style="margin: 25px 0;">
-                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 15px; font-size: 12pt;">6. ОТВЕТСТВЕННОСТИ СТОРОН</div>
-                
-                <div style="margin-bottom: 15px; text-align: justify;">
-                    <span style="font-weight: bold;">6.1.</span> За неисполнение или ненадлежащее исполнение условий данного Договора стороны несут ответственность в соответствии с действующим Законодательством РФ.
-                </div>
-                
-                <div style="margin-bottom: 15px; text-align: justify;">
-                    <span style="font-weight: bold;">6.2.</span> Арендатор несет ответственность за соблюдение норм поведения в жилом помещении и за действия граждан, постоянно в нем проживающих, которые нарушают условия данного Договора.
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">6.3.</span> Ликвидация последствий аварий, произошедших по вине Арендатора, производится за счет Арендатора.
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">6.4.</span> Арендатор возмещает материальный ущерб, причиненный имуществу, указанному в Приложении № 1.
-                </div>
-                
-                <div style="margin-bottom: 15px; text-align: justify;">
-                    <span style="font-weight: bold;">6.5.</span> Арендатор не несет ответственность за естественную амортизацию жилого помещения, установленного в нем оборудования, мебели и иного имущества.
-                </div>
-                
-                <div style="margin-bottom: 15px; text-align: justify;">
-                    <span style="font-weight: bold;">6.6.</span> Арендатор несет полную материальную ответственность за ущерб жилому помещению, установленному в нем оборудованию, мебели и иному имуществу, а также прилегающим помещениям, нанесенный по вине или грубой неосторожности Арендатора и/или лиц по п.5, его гостей, а также домашних животных.
-                </div>
-            </div>
-
-            <div style="margin: 25px 0;">
-                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 15px; font-size: 12pt;">7. РАСТОРЖЕНИЕ ДОГОВОРА АРЕНДЫ ЖИЛОГО ПОМЕЩЕНИЯ</div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">7.1.</span> Договор может быть расторгнут по взаимному согласию сторон с письменным предупреждением за 30 (тридцать) дней до предполагаемой даты расторжения Договора.
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">7.2.</span> Данный Договор может быть расторгнут по требованию Арендодателя в следующих случаях:
-                    <div style="margin-left: 20px; margin-top: 10px;">
-                        <span style="font-weight: bold;">7.2.1.</span> При несоблюдении Арендатором условий данного Договора.
-                    </div>
-                    <div style="margin-left: 20px; margin-top: 10px;">
-                        <span style="font-weight: bold;">7.2.2.</span> При просрочке оплаты за аренду Арендатором более чем на один день.
-                    </div>
-                    <div style="margin-left: 20px; margin-top: 10px;">
-                        <span style="font-weight: bold;">7.2.3.</span> При разрушении или порче жилого помещения, в случае причинения существенных убытков установленному в нем оборудованию, мебели и иному имуществу Арендатором или другими гражданами, за действия которых он отвечает.
-                    </div>
-                    <div style="margin-left: 20px; margin-top: 10px;">
-                        <span style="font-weight: bold;">7.2.4.</span> Если Арендатор или другие граждане, за действия которых он отвечает, используют жилое помещение не по назначению или нарушают права и интересы соседей.
-                    </div>
-                    <div style="margin-left: 20px; margin-top: 10px;">
-                        <span style="font-weight: bold;">7.2.5.</span> В случае досрочного расторжения настоящего Договора по вине или инициативе Арендатора страховой депозит ему не возвращается.
-                    </div>
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-weight: bold;">7.3.</span> Настоящий Договор может быть расторгнут по требованию любой из сторон в случае, если жилое помещение перестанет быть пригодным для постоянного проживания, а также в случае его аварийного состояния (по заключению РЭУ).
-                </div>
-            </div>
-            
-            <div style="margin-top: 50px; font-size: 10pt; color: #666; text-align: right;">Страница 6</div>
-        </div>
-
-        <!-- Страница 7 (последняя) -->
-        <div class="page">
-            <div style="margin: 25px 0;">
-                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 15px; font-size: 12pt;">8. ПРОЧИЕ УСЛОВИЯ</div>
-                
-                <div style="margin-bottom: 15px;">
-                    8.1. Договор составлен в двух экземплярах, имеющих одинаковую юридическую силу, по одному экземпляру для каждой из сторон.
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    8.2. Паспортные данные сторон:
-                </div>
-                
-                <div style="margin: 15px 0; padding: 15px; border: 1px solid #ddd; background: #f9f9f9;">
-                    <div style="font-weight: bold; margin-bottom: 10px;">АРЕНДОДАТЕЛЬ:</div>
-                    <div>ФИО: ${data.landlordName}</div>
-                    <div>Паспорт: серия/номер ${data.landlordPassport}</div>
-                    <div>Выдан: ${data.landlordIssueDate}, ${data.landlordIssuedBy}</div>
-                    <div>Код подразделения: ${data.landlordDivisionCode}</div>
-                    <div>Зарегистрирован(а): ${data.landlordRegistration}</div>
-                </div>
-                
-                <div style="margin: 15px 0; padding: 15px; border: 1px solid #ddd; background: #f9f9f9;">
-                    <div style="font-weight: bold; margin-bottom: 10px;">АРЕНДАТОР:</div>
-                    <div>ФИО: ${data.tenantName}</div>
-                    <div>Паспорт: серия/номер ${data.tenantPassport}</div>
-                    <div>Выдан: ${data.tenantIssueDate}, ${data.tenantIssuedBy}</div>
-                    <div>Код подразделения: ${data.tenantDivisionCode}</div>
-                    <div>Зарегистрирован(а): ${data.tenantRegistration}</div>
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    8.3. Все изменения и дополнения к настоящему Договору действительны лишь в том случае, если они совершены в письменной форме и подписаны обеими сторонами.
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    8.4. Во всем остальном, что не предусмотрено настоящим Договором, стороны руководствуются действующим законодательством Российской Федерации.
-                </div>
-            </div>
-
-            <div style="margin-top: 80px; display: flex; justify-content: space-between; align-items: flex-end;">
-                <div style="width: 45%; text-align: center;">
-                    <div style="font-weight: bold;">Арендодатель:</div>
-                    <div style="margin-top: 60px; border-top: 1px solid #000; padding-top: 5px;">
-                        ${data.landlordName}
-                    </div>
-                    <div style="font-size: 11pt; margin-top: 5px;">(подпись)</div>
-                </div>
-                
-                <div style="width: 45%; text-align: center;">
-                    <div style="font-weight: bold;">Арендатор:</div>
-                    <div style="margin-top: 60px; border-top: 1px solid #000; padding-top: 5px;">
-                        ${data.tenantName}
-                    </div>
-                    <div style="font-size: 11pt; margin-top: 5px;">(подпись)</div>
-                </div>
-            </div>
-            
-            <div style="margin-top: 50px; font-size: 10pt; color: #666; text-align: right;">Страница 7</div>
-        </div>
-    `;
+    if (errors.length > 0) {
+        alert('Пожалуйста, заполните все обязательные поля:\n\n• ' + errors.join('\n• '));
+        return false;
+    }
     
-    return html;
+    return true;
 }
 
 // Скачать PDF
 async function downloadPDF() {
-    showLoading('Создаем PDF файл...');
+    showLoading('Создаем PDF...');
     
     try {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({
             orientation: 'portrait',
             unit: 'mm',
-            format: 'a4'
+            format: 'a4',
+            putOnlyUsedFonts: true
         });
         
         // Получаем содержимое договора
         const contractElement = document.getElementById('contractPreview');
-        const pages = contractElement.querySelectorAll('.page');
         
-        // Для каждой страницы создаем отдельный PDF
-        for (let i = 0; i < pages.length; i++) {
-            if (i > 0) {
-                doc.addPage(); // Добавляем новую страницу для каждой следующей страницы договора
+        // Конвертируем в изображение
+        const canvas = await html2canvas(contractElement, {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff'
+        });
+        
+        const imgData = canvas.toDataURL('image/png');
+        const imgWidth = 190;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        
+        // Вычисляем высоту страницы PDF
+        const pageHeight = doc.internal.pageSize.height;
+        let position = 0;
+        
+        while (position < imgHeight) {
+            if (position > 0) {
+                doc.addPage();
             }
             
-            // Клонируем страницу
-            const pageClone = pages[i].cloneNode(true);
+            // Вырезаем часть изображения для текущей страницы
+            const sliceHeight = Math.min(pageHeight - 20, imgHeight - position);
+            const canvasSlice = document.createElement('canvas');
+            const ctxSlice = canvasSlice.getContext('2d');
             
-            // Создаем временный контейнер для рендеринга
-            const tempContainer = document.createElement('div');
-            tempContainer.style.position = 'absolute';
-            tempContainer.style.left = '-9999px';
-            tempContainer.style.width = '210mm';
-            tempContainer.style.padding = '20mm';
-            tempContainer.style.fontFamily = 'Times New Roman';
-            tempContainer.style.fontSize = '12pt';
-            tempContainer.style.lineHeight = '1.6';
+            canvasSlice.width = canvas.width;
+            canvasSlice.height = (sliceHeight * canvas.width) / imgWidth;
             
-            tempContainer.appendChild(pageClone);
-            document.body.appendChild(tempContainer);
+            ctxSlice.drawImage(
+                canvas,
+                0,
+                (position * canvas.width) / imgWidth,
+                canvas.width,
+                (sliceHeight * canvas.width) / imgWidth,
+                0,
+                0,
+                canvas.width,
+                (sliceHeight * canvas.width) / imgWidth
+            );
             
-            // Используем html2canvas для конвертации
-            const html2canvasScript = document.createElement('script');
-            html2canvasScript.src = 'https://html2canvas.hertzen.com/dist/html2canvas.min.js';
-            document.head.appendChild(html2canvasScript);
+            const sliceImgData = canvasSlice.toDataURL('image/png');
             
-            await new Promise(resolve => {
-                html2canvasScript.onload = resolve;
-            });
+            // Добавляем изображение страницы в PDF
+            doc.addImage(sliceImgData, 'PNG', 10, 10, imgWidth, sliceHeight);
             
-            const canvas = await html2canvas(pageClone, {
-                scale: 2,
-                useCORS: true,
-                logging: false,
-                backgroundColor: '#ffffff',
-                width: pageClone.offsetWidth,
-                height: pageClone.offsetHeight
-            });
-            
-            document.body.removeChild(tempContainer);
-            document.head.removeChild(html2canvasScript);
-            
-            const imgData = canvas.toDataURL('image/png');
-            const imgWidth = 190;
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            
-            // Добавляем изображение на страницу PDF
-            doc.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+            position += sliceHeight;
         }
         
         // Сохраняем файл
@@ -978,89 +1048,135 @@ async function downloadPDF() {
     } catch (error) {
         console.error('Ошибка создания PDF:', error);
         hideLoading();
-        alert('Ошибка при создании PDF файла. Пожалуйста, используйте функцию печати.');
+        alert('Ошибка при создании PDF. Пожалуйста, используйте функцию печати.');
     }
 }
 
 // Печать договора
 function printContract() {
     const printContent = document.getElementById('contractPreview').innerHTML;
-    const originalContent = document.body.innerHTML;
+    const printWindow = window.open('', '_blank');
     
-    document.body.innerHTML = `
+    printWindow.document.write(`
         <!DOCTYPE html>
         <html>
         <head>
             <title>Договор аренды - Печать</title>
+            <meta charset="UTF-8">
             <style>
                 body {
                     font-family: 'Times New Roman', serif;
                     font-size: 12pt;
-                    line-height: 1.6;
+                    line-height: 1.5;
                     margin: 0;
-                    padding: 20mm;
+                    padding: 0;
                 }
                 .page {
                     page-break-after: always;
-                    margin-bottom: 30mm;
+                    padding: 20mm;
+                    min-height: 297mm;
                 }
                 .page:last-child {
                     page-break-after: auto;
                 }
-                @media print {
-                    body { margin: 0; padding: 0; }
-                    .no-print { display: none !important; }
-                    @page {
-                        margin: 20mm;
-                    }
+                .contract-header {
+                    text-align: center;
+                    margin-bottom: 30px;
+                    padding-bottom: 20px;
+                    border-bottom: 1px solid #000;
                 }
-                .print-controls {
-                    position: fixed;
+                .contract-title {
+                    font-size: 14pt;
+                    font-weight: bold;
+                    text-transform: uppercase;
+                    margin-bottom: 10px;
+                }
+                .section-title {
+                    font-weight: bold;
+                    text-decoration: underline;
+                    margin: 25px 0 15px;
+                }
+                .clause {
+                    margin-bottom: 15px;
+                    text-align: justify;
+                }
+                .clause-number {
+                    font-weight: bold;
+                }
+                .signature-block {
+                    margin-top: 50px;
+                    display: flex;
+                    justify-content: space-between;
+                }
+                .signature {
+                    width: 45%;
+                    text-align: center;
+                }
+                .signature-line {
+                    border-top: 1px solid #000;
+                    margin-top: 50px;
+                    width: 100%;
+                }
+                .underline {
+                    text-decoration: underline;
+                }
+                .bold {
+                    font-weight: bold;
+                }
+                .indent {
+                    margin-left: 20px;
+                    margin-top: 10px;
+                }
+                .page-number {
+                    position: absolute;
                     bottom: 20px;
                     right: 20px;
-                    background: white;
-                    padding: 15px;
-                    border-radius: 8px;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-                    z-index: 1000;
+                    font-size: 10pt;
+                    color: #666;
+                }
+                .passport-data {
+                    margin: 15px 0;
+                    padding: 10px;
+                    border: 1px solid #ddd;
+                    background: #f9f9f9;
+                }
+                @media print {
+                    .no-print { display: none !important; }
+                    @page { margin: 20mm; }
                 }
             </style>
         </head>
         <body>
             ${printContent}
-            <div class="no-print print-controls">
-                <button onclick="window.print()" style="padding: 12px 24px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; margin-right: 10px; font-weight: bold;">
-                    🖨️ Печать
+            <div class="no-print" style="position: fixed; bottom: 20px; right: 20px; background: white; padding: 10px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+                <button onclick="window.print()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">
+                    Печать
                 </button>
-                <button onclick="window.close()" style="padding: 12px 24px; background: #dc3545; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
-                    ✕ Закрыть
+                <button onclick="window.close()" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    Закрыть
                 </button>
             </div>
         </body>
         </html>
-    `;
+    `);
     
-    window.focus();
-    window.print();
+    printWindow.document.close();
+    printWindow.focus();
     
-    // Восстанавливаем оригинальное содержимое
+    // Автопечать через 1 секунду
     setTimeout(() => {
-        document.body.innerHTML = originalContent;
-        // Переинициализируем обработчики событий
-        setupEventListeners();
+        printWindow.print();
     }, 1000);
 }
 
-// Вспомогательные функции
-function formatDate(dateStr) {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}.${month}.${year}`;
+// Завершить
+function finish() {
+    if (confirm('Спасибо за использование генератора договоров!\n\nНачать новый договор?')) {
+        location.reload();
+    }
 }
 
+// Вспомогательные функции
 function showLoading(message) {
     const modal = document.getElementById('loadingModal');
     const text = document.getElementById('loadingText');
@@ -1112,7 +1228,6 @@ function saveFormData() {
             basisDocument: document.getElementById('basisDocument').value,
             
             // Условия
-            contractDate: document.getElementById('contractDate').value,
             rentAmount: document.getElementById('rentAmount').value,
             depositAmount: document.getElementById('depositAmount').value,
             contractStart: document.getElementById('contractStart').value,
@@ -1170,7 +1285,6 @@ function loadSavedData() {
         if (data.basisDocument) document.getElementById('basisDocument').value = data.basisDocument;
         
         // Восстанавливаем условия
-        if (data.contractDate) document.getElementById('contractDate').value = data.contractDate;
         if (data.rentAmount) document.getElementById('rentAmount').value = data.rentAmount;
         if (data.depositAmount) document.getElementById('depositAmount').value = data.depositAmount;
         if (data.contractStart) document.getElementById('contractStart').value = data.contractStart;
@@ -1183,7 +1297,7 @@ function loadSavedData() {
         
         // Восстанавливаем проживающих
         if (data.residents && data.residents.length > 0) {
-            document.getElementById('residentsContainer').innerHTML = '';
+            document.getElementById('residentsList').innerHTML = '';
             data.residents.forEach(resident => {
                 addResident(resident.name);
                 const items = document.querySelectorAll('.resident-item');
@@ -1192,6 +1306,8 @@ function loadSavedData() {
                     lastItem.querySelector('.resident-birthdate').value = resident.birthdate;
                 }
             });
+        } else {
+            initResidents();
         }
         
         // Восстанавливаем текущий шаг
