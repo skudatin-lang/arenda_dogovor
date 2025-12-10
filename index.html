@@ -16,7 +16,7 @@
                 <i class="fas fa-file-contract"></i>
                 <h1>Генератор договора аренды</h1>
             </div>
-            <p class="subtitle">Загрузите фото паспорта для автоматического заполнения данных</p>
+            <p class="subtitle">Заполните форму для автоматического создания договора</p>
         </header>
 
         <!-- Прогресс-бар -->
@@ -27,90 +27,20 @@
             <div class="progress-steps">
                 <div class="step active" data-step="1">
                     <div class="step-circle">1</div>
-                    <div class="step-label">Загрузка паспорта</div>
+                    <div class="step-label">Ввод данных</div>
                 </div>
                 <div class="step" data-step="2">
                     <div class="step-circle">2</div>
-                    <div class="step-label">Ввод данных</div>
-                </div>
-                <div class="step" data-step="3">
-                    <div class="step-circle">3</div>
                     <div class="step-label">Договор</div>
                 </div>
             </div>
         </div>
 
-        <!-- Шаг 1: Загрузка паспорта -->
+        <!-- Шаг 1: Ввод данных -->
         <section id="step1" class="step active">
             <div class="step-header">
-                <h2><i class="fas fa-camera"></i> Загрузка паспорта</h2>
-                <p>Сфотографируйте или загрузите фото разворота паспорта с данными</p>
-            </div>
-
-            <div class="upload-container">
-                <div class="upload-area" id="uploadArea">
-                    <div class="upload-icon">
-                        <i class="fas fa-cloud-upload-alt"></i>
-                    </div>
-                    <h3>Перетащите фото сюда</h3>
-                    <p>или нажмите для выбора файла</p>
-                    <p class="file-types">Поддерживаемые форматы: JPG, PNG</p>
-                    <input type="file" id="fileInput" accept="image/*" capture="environment">
-                    <label for="fileInput" class="upload-btn">
-                        <i class="fas fa-folder-open"></i> Выбрать файл
-                    </label>
-                </div>
-
-                <div class="camera-option">
-                    <button class="camera-btn" onclick="openCamera()">
-                        <i class="fas fa-camera"></i> Сделать фото
-                    </button>
-                    <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;">
-                </div>
-
-                <div class="tips">
-                    <h4><i class="fas fa-lightbulb"></i> Советы для лучшего распознавания:</h4>
-                    <ul>
-                        <li>Сфотографируйте страницу с фото и данными паспорта</li>
-                        <li>Держите камеру параллельно документу</li>
-                        <li>Убедитесь, что все данные четко видны</li>
-                        <li>Избегайте бликов и теней</li>
-                    </ul>
-                </div>
-            </div>
-
-            <div class="preview-container" id="previewContainer" style="display: none;">
-                <div class="preview-header">
-                    <h3>Предпросмотр документа</h3>
-                    <button class="btn-close" onclick="clearPreview()">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="preview-content">
-                    <img id="imagePreview" alt="Предпросмотр документа">
-                    <div class="preview-actions">
-                        <button class="btn-secondary" onclick="clearPreview()">
-                            <i class="fas fa-redo"></i> Загрузить другой
-                        </button>
-                        <button class="btn-primary" onclick="recognizeText()" id="recognizeBtn">
-                            <i class="fas fa-search"></i> Распознать текст
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="step-actions">
-                <button class="btn-primary" onclick="skipToManual()" style="background-color: #6c757d;">
-                    <i class="fas fa-keyboard"></i> Ввести данные вручную
-                </button>
-            </div>
-        </section>
-
-        <!-- Шаг 2: Ввод данных -->
-        <section id="step2" class="step">
-            <div class="step-header">
                 <h2><i class="fas fa-edit"></i> Заполнение данных</h2>
-                <p>Проверьте и дополните информацию для договора</p>
+                <p>Введите информацию для договора аренды квартиры</p>
             </div>
 
             <div class="data-container">
@@ -122,27 +52,27 @@
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="landlordName">ФИО полностью *</label>
-                            <input type="text" id="landlordName" placeholder="Иванов Иван Иванович">
+                            <input type="text" id="landlordName" placeholder="Любимова Ольга Викторовна" required>
                         </div>
                         <div class="form-group">
                             <label for="landlordPassport">Паспорт (серия номер) *</label>
-                            <input type="text" id="landlordPassport" placeholder="4512 123456">
+                            <input type="text" id="landlordPassport" placeholder="4512 123456" required>
                         </div>
                         <div class="form-group">
                             <label for="landlordIssuedBy">Кем выдан *</label>
-                            <textarea id="landlordIssuedBy" rows="2" placeholder="ОВД района..."></textarea>
+                            <textarea id="landlordIssuedBy" rows="2" placeholder="ОВД района..." required></textarea>
                         </div>
                         <div class="form-group">
                             <label for="landlordIssueDate">Дата выдачи *</label>
-                            <input type="date" id="landlordIssueDate">
+                            <input type="date" id="landlordIssueDate" required>
                         </div>
                         <div class="form-group">
                             <label for="landlordDivisionCode">Код подразделения *</label>
-                            <input type="text" id="landlordDivisionCode" placeholder="770-001">
+                            <input type="text" id="landlordDivisionCode" placeholder="770-001" required>
                         </div>
                         <div class="form-group full-width">
                             <label for="landlordRegistration">Адрес регистрации *</label>
-                            <textarea id="landlordRegistration" rows="2" placeholder="г. Москва, ул. Примерная, д. 1, кв. 1"></textarea>
+                            <textarea id="landlordRegistration" rows="2" placeholder="г. Москва, ул. Примерная, д. 1, кв. 1" required></textarea>
                         </div>
                     </div>
                 </div>
@@ -155,27 +85,27 @@
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="tenantName">ФИО полностью *</label>
-                            <input type="text" id="tenantName" placeholder="Петров Петр Петрович">
+                            <input type="text" id="tenantName" placeholder="Янгилжан Ускиновна Хайтбаева" required>
                         </div>
                         <div class="form-group">
                             <label for="tenantPassport">Паспорт (серия номер) *</label>
-                            <input type="text" id="tenantPassport" placeholder="4512 654321">
+                            <input type="text" id="tenantPassport" placeholder="4512 654321" required>
                         </div>
                         <div class="form-group">
                             <label for="tenantIssuedBy">Кем выдан *</label>
-                            <textarea id="tenantIssuedBy" rows="2"></textarea>
+                            <textarea id="tenantIssuedBy" rows="2" required></textarea>
                         </div>
                         <div class="form-group">
                             <label for="tenantIssueDate">Дата выдачи *</label>
-                            <input type="date" id="tenantIssueDate">
+                            <input type="date" id="tenantIssueDate" required>
                         </div>
                         <div class="form-group">
                             <label for="tenantDivisionCode">Код подразделения *</label>
-                            <input type="text" id="tenantDivisionCode" placeholder="770-002">
+                            <input type="text" id="tenantDivisionCode" placeholder="770-002" required>
                         </div>
                         <div class="form-group full-width">
                             <label for="tenantRegistration">Адрес регистрации *</label>
-                            <textarea id="tenantRegistration" rows="2"></textarea>
+                            <textarea id="tenantRegistration" rows="2" required></textarea>
                         </div>
                     </div>
                 </div>
@@ -188,19 +118,19 @@
                     <div class="form-grid">
                         <div class="form-group full-width">
                             <label for="apartmentAddress">Адрес квартиры *</label>
-                            <input type="text" id="apartmentAddress" placeholder="г. Москва, ул. Примерная, д. 1, кв. 1">
+                            <input type="text" id="apartmentAddress" placeholder="г. Москва, Волгоградский проспект дом 164 корп. 3, кв. 22" required>
                         </div>
                         <div class="form-group">
                             <label for="apartmentArea">Площадь (кв.м) *</label>
-                            <input type="number" id="apartmentArea" placeholder="58">
+                            <input type="number" id="apartmentArea" value="58" required>
                         </div>
                         <div class="form-group">
                             <label for="roomsCount">Количество комнат *</label>
-                            <input type="number" id="roomsCount" placeholder="3">
+                            <input type="number" id="roomsCount" value="3" required>
                         </div>
                         <div class="form-group full-width">
                             <label for="basisDocument">Основание собственности *</label>
-                            <input type="text" id="basisDocument" placeholder="Наследство по закону">
+                            <input type="text" id="basisDocument" value="Наследство по закону" required>
                         </div>
                     </div>
                 </div>
@@ -213,19 +143,19 @@
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="rentAmount">Сумма аренды (руб/мес) *</label>
-                            <input type="number" id="rentAmount" placeholder="47000">
+                            <input type="number" id="rentAmount" value="47000" required>
                         </div>
                         <div class="form-group">
                             <label for="depositAmount">Депозит (руб) *</label>
-                            <input type="number" id="depositAmount" placeholder="47000">
+                            <input type="number" id="depositAmount" value="47000" required>
                         </div>
                         <div class="form-group">
                             <label for="contractStart">Начало аренды *</label>
-                            <input type="date" id="contractStart">
+                            <input type="date" id="contractStart" required>
                         </div>
                         <div class="form-group">
                             <label for="contractEnd">Окончание аренды *</label>
-                            <input type="date" id="contractEnd">
+                            <input type="date" id="contractEnd" required>
                         </div>
                     </div>
                 </div>
@@ -266,17 +196,14 @@
             </div>
 
             <div class="step-actions">
-                <button class="btn-secondary" onclick="goToStep(1)">
-                    <i class="fas fa-arrow-left"></i> Назад
-                </button>
                 <button class="btn-primary" onclick="generateContract()">
                     <i class="fas fa-file-contract"></i> Сформировать договор
                 </button>
             </div>
         </section>
 
-        <!-- Шаг 3: Договор -->
-        <section id="step3" class="step">
+        <!-- Шаг 2: Договор -->
+        <section id="step2" class="step">
             <div class="step-header">
                 <h2><i class="fas fa-file-alt"></i> Договор аренды</h2>
                 <p>Проверьте сформированный договор перед скачиванием</p>
@@ -290,19 +217,13 @@
                     <button class="btn-primary" onclick="downloadPDF()">
                         <i class="fas fa-download"></i> Скачать PDF
                     </button>
+                    <button class="btn-secondary" onclick="goToStep(1)">
+                        <i class="fas fa-edit"></i> Редактировать
+                    </button>
                 </div>
                 <div class="contract-preview" id="contractPreview">
                     <!-- Договор будет вставлен здесь -->
                 </div>
-            </div>
-
-            <div class="step-actions">
-                <button class="btn-secondary" onclick="goToStep(2)">
-                    <i class="fas fa-arrow-left"></i> Редактировать данные
-                </button>
-                <button class="btn-primary" onclick="finish()">
-                    <i class="fas fa-check"></i> Завершить
-                </button>
             </div>
         </section>
     </div>
@@ -315,41 +236,7 @@
         </div>
     </div>
 
-    <!-- Модальное окно OCR результатов -->
-    <div id="ocrModal" class="modal">
-        <div class="modal-content ocr-modal">
-            <h3><i class="fas fa-search"></i> Результаты распознавания</h3>
-            <div class="ocr-results">
-                <div class="ocr-field">
-                    <label>Найденные ФИО:</label>
-                    <input type="text" id="ocrFullName" placeholder="ФИО из паспорта">
-                </div>
-                <div class="ocr-field">
-                    <label>Паспорт (серия/номер):</label>
-                    <input type="text" id="ocrPassport" placeholder="4512 123456">
-                </div>
-                <div class="ocr-field">
-                    <label>Дата выдачи:</label>
-                    <input type="date" id="ocrIssueDate">
-                </div>
-                <div class="ocr-field">
-                    <label>Код подразделения:</label>
-                    <input type="text" id="ocrDivisionCode" placeholder="770-001">
-                </div>
-            </div>
-            <div class="modal-actions">
-                <button class="btn-secondary" onclick="closeOCRModal()">
-                    Закрыть
-                </button>
-                <button class="btn-primary" onclick="applyOCRData()">
-                    Применить данные
-                </button>
-            </div>
-        </div>
-    </div>
-
     <!-- Подключаем библиотеки -->
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
