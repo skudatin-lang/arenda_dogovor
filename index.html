@@ -1,52 +1,9 @@
-<!-- В разделе "Данные договора" добавьте эти поля после существующих: -->
-<div class="data-section">
-    <h3><i class="fas fa-home"></i> Данные договора</h3>
-    <div class="form-grid">
-        <div class="form-group full-width">
-            <label for="apartmentAddress">Адрес квартиры:</label>
-            <input type="text" id="apartmentAddress" value="г. Москва, Волгоградский проспект дом 164 корп. 3, кв. 22" required>
-        </div>
-        <div class="form-group">
-            <label for="apartmentArea">Площадь (кв.м):</label>
-            <input type="number" id="apartmentArea" value="58" required>
-        </div>
-        <div class="form-group">
-            <label for="roomsCount">Количество комнат:</label>
-            <input type="number" id="roomsCount" value="3" required>
-        </div>
-        <div class="form-group">
-            <label for="rentAmount">Сумма аренды (руб):</label>
-            <input type="number" id="rentAmount" value="47000" required>
-        </div>
-        <div class="form-group">
-            <label for="depositAmount">Депозит (руб):</label>
-            <input type="number" id="depositAmount" value="47000" required>
-        </div>
-        <div class="form-group">
-            <label for="contractStart">Начало аренды:</label>
-            <input type="date" id="contractStart" required>
-        </div>
-        <div class="form-group">
-            <label for="contractEnd">Окончание аренды:</label>
-            <input type="date" id="contractEnd" required>
-        </div>
-        <div class="form-group full-width">
-            <label for="basisDocument">Основание собственности:</label>
-            <input type="text" id="basisDocument" value="Наследство по закону" required>
-        </div>
-        
-        <!-- Показания счетчиков -->
-        <div class="form-group">
-            <label for="electricityCounter">Показания электросчетчика:</label>
-            <input type="text" id="electricityCounter" placeholder="Например: 12345">
-        </div>
-        <div class="form-group">
-            <label for="hotWaterCounter">Показания горячей воды:</label>
-            <input type="text" id="hotWaterCounter" placeholder="Например: 678">
-        </div>
-        <div class="form-group">
-            <label for="coldWaterCounter">Показания холодной воды:</label>
-            <input type="text" id="coldWaterCounter" placeholder="Например: 890">
-        </div>
-    </div>
+<!-- В разделе "Шаг 1" добавьте этот блок после загрузки фото: -->
+<div class="form-group" style="margin: 20px 0;">
+    <label for="userRole">Чей паспорт сканируем?</label>
+    <select id="userRole" class="form-control">
+        <option value="tenant">Паспорт Арендатора</option>
+        <option value="landlord">Паспорт Арендодателя</option>
+    </select>
+    <small id="roleInfo" class="form-text text-muted">(будут заполнены данные Арендатора)</small>
 </div>
