@@ -4,7 +4,6 @@ let currentStep = 1;
 // Инициализация при загрузке
 document.addEventListener('DOMContentLoaded', function() {
     initApp();
-    setupEventListeners();
     loadSavedData();
     updateProgress();
 });
@@ -14,13 +13,13 @@ function initApp() {
     // Установим даты по умолчанию
     const today = new Date();
     const nextMonth = new Date(today);
-    nextMonth.setMonth(nextMonth.getMonth() + 10); // 10 месяцев аренды
+    nextMonth.setMonth(nextMonth.getMonth() + 11); // 11 месяцев = почти год
     
     // Форматируем даты для input type="date"
     document.getElementById('contractStart').value = formatDateForInput(today);
     document.getElementById('contractEnd').value = formatDateForInput(nextMonth);
     
-    // Установим даты выдачи паспортов (5 лет назад)
+    // Установим текущую дату выдачи паспортов (примерно 5 лет назад)
     const fiveYearsAgo = new Date();
     fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
     document.getElementById('landlordIssueDate').value = formatDateForInput(fiveYearsAgo);
@@ -28,6 +27,9 @@ function initApp() {
     
     // Инициализируем список проживающих
     initResidents();
+    
+    // Настройка автосохранения
+    setupAutoSave();
 }
 
 // Форматирование даты для input type="date"
@@ -38,10 +40,52 @@ function formatDateForInput(date) {
     return `${year}-${month}-${day}`;
 }
 
-// Настройка обработчиков событий
-function setupEventListeners() {
-    // Автосохранение при вводе
+// Настройка автосохранения
+function setupAutoSave() {
     document.addEventListener('input', debounce(saveFormData, 1000));
+}
+
+// Инициализация списка проживающих
+function initResidents() {
+    const residentsList = document.getElementById('residentsList');
+    const defaultResidents = [
+        'Адамбаев Абат',
+        'Адамбаев Джамшут',
+        'Хайтбаева Рубия',
+        'Кутлимуратов Абаз',
+        'Ибрагимов Мадер',
+        'Хайтбаева Янгилжан'
+    ];
+    
+    defaultResidents.forEach(name => {
+        addResident(name);
+    });
+}
+
+// Добавить проживающего
+function addResident(name = '') {
+    const residentsList = document.getElementById('residentsList');
+    const residentItem = document.createElement('div');
+    residentItem.className = 'resident-item';
+    residentItem.innerHTML = `
+        <input type="text" placeholder="ФИО" value="${name}" 
+               oninput="saveFormData()" class="resident-name">
+        <input type="date" placeholder="Дата рождения" 
+               oninput="saveFormData()" class="resident-birthdate">
+        <button type="button" class="resident-remove" onclick="removeResident(this)">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    residentsList.appendChild(residentItem);
+}
+
+// Удалить проживающего
+function removeResident(button) {
+    if (confirm('Удалить этого проживающего?')) {
+        button.closest('.resident-item').remove();
+        saveFormData();
+    }
 }
 
 // Навигация по шагам
@@ -65,7 +109,7 @@ function goToStep(step) {
 // Обновление прогресс-бара
 function updateProgress() {
     const progressFill = document.getElementById('progressFill');
-    const progress = ((currentStep - 1) / 1) * 100; // 2 шага: 0% и 100%
+    const progress = ((currentStep - 1) / 1) * 100; // 2 шага, поэтому делим на 1
     progressFill.style.width = `${progress}%`;
     
     // Обновить активные шаги
@@ -77,50 +121,6 @@ function updateProgress() {
             el.classList.remove('active');
         }
     });
-}
-
-// Инициализация списка проживающих
-function initResidents() {
-    const residentsList = document.getElementById('residentsList');
-    const defaultResidents = [
-        'Адамбаев Абат',
-        'Адамбаев Джамшут',
-        'Хайтбаева Рубия',
-        'Кутлимуратов Абаз',
-        'Ибрагимов Мадер',
-        'Хайтбаева Янгилжан'
-    ];
-    
-    defaultResidents.forEach(name => {
-        addResident(name);
-    });
-}
-
-// Добавить проживающего
-function addResident(name = '') {
-    const residentsList = document.getElementById('residentsList');
-    
-    const residentItem = document.createElement('div');
-    residentItem.className = 'resident-item';
-    residentItem.innerHTML = `
-        <input type="text" placeholder="ФИО" value="${name}" 
-               oninput="saveFormData()" class="resident-name">
-        <input type="date" placeholder="Дата рождения" 
-               oninput="saveFormData()" class="resident-birthdate">
-        <button type="button" class="resident-remove" onclick="removeResident(this)">
-            <i class="fas fa-times"></i>
-        </button>
-    `;
-    
-    residentsList.appendChild(residentItem);
-}
-
-// Удалить проживающего
-function removeResident(button) {
-    if (confirm('Удалить этого проживающего?')) {
-        button.closest('.resident-item').remove();
-        saveFormData();
-    }
 }
 
 // Генерация договора
@@ -161,13 +161,13 @@ function generateContractHTML(data) {
     let residentsHTML = '';
     data.residents.forEach((resident, index) => {
         residentsHTML += `
-            <div class="resident-line">
+            <div class="clause">
                 ${index + 1}. Ф.И.О., дата рождения <strong>${resident.name}</strong>${resident.birthdate ? `, ${resident.birthdate}` : ''}
             </div>
         `;
     });
     
-    // Формируем полный договор с разбивкой на страницы А4
+    // Формируем полный договор с правильной разбивкой на страницы А4
     return `
         <!-- Страница 1 -->
         <div class="contract-page">
@@ -206,6 +206,14 @@ function generateContractHTML(data) {
                 <div class="clause">
                     <span class="clause-number">1.4.</span> Срок аренды определяется <span class="bold">с ${data.contractStart} по ${data.contractEnd}</span> с пролонгацией по взаимному письменному согласию сторон.
                 </div>
+                
+                <div class="clause">
+                    <span class="clause-number">1.5.</span> В жилом помещении имеют право проживать лица, указанные в п.5 настоящего Договора.
+                </div>
+                
+                <div class="clause">
+                    <span class="clause-number">1.6.</span> Передача жилого помещения будет удостоверена обеими сторонами путем подписания акта приема-передачи жилого помещения по форме, указанной в Приложении № 1.
+                </div>
             </div>
             
             <div class="signature-block">
@@ -226,14 +234,6 @@ function generateContractHTML(data) {
 
         <!-- Страница 2 -->
         <div class="contract-page">
-            <div class="clause">
-                <span class="clause-number">1.5.</span> В жилом помещении имеют право проживать лица, указанные в п.5 настоящего Договора.
-            </div>
-            
-            <div class="clause">
-                <span class="clause-number">1.6.</span> Передача жилого помещения будет удостоверена обеими сторонами путем подписания акта приема-передачи жилого помещения по форме, указанной в Приложении № 1.
-            </div>
-
             <div class="section">
                 <div class="section-title">2. ПОРЯДОК ОПЛАТЫ ЖИЛОГО ПОМЕЩЕНИЯ</div>
                 
@@ -263,6 +263,18 @@ function generateContractHTML(data) {
                 <div class="clause">
                     <span class="clause-number">2.5.</span> Электроэнергию оплачивает <span class="bold">Арендатор</span> (Арендодатель / Арендатор). Показания счетчика на дату передачи помещения в найм: <span class="underline">${data.electricityCounter}</span>.
                 </div>
+                
+                <div class="clause">
+                    <span class="clause-number">2.6.</span> Коммунальные услуги оплачивает <span class="bold">Арендатор</span> (Арендодатель / Арендатор).
+                </div>
+                
+                <div class="clause">
+                    <span class="clause-number">2.7.</span> Абонентскую плату за интернет оплачивает <span class="bold">Арендатор</span> (Арендодатель / Арендатор).
+                </div>
+                
+                <div class="clause">
+                    <span class="clause-number">2.8.</span> В случае наличия счетчиков горячей и холодной воды оплату за воду производит <span class="bold">Арендатор</span> (Арендодатель / Арендатор). Показания счетчиков на дату передачи помещения в найм: горячей воды <span class="underline">${data.hotWaterCounter}</span>, холодной воды <span class="underline">${data.coldWaterCounter}</span>.
+                </div>
             </div>
             
             <div class="signature-block">
@@ -284,31 +296,6 @@ function generateContractHTML(data) {
         <!-- Страница 3 -->
         <div class="contract-page">
             <div class="clause">
-                <span class="clause-number">2.6.</span> Коммунальные услуги оплачивает <span class="bold">Арендатор</span> (Арендодатель / Арендатор).
-            </div>
-            
-            <div class="clause">
-                <span class="clause-number">2.7.</span> Абонентскую плату за интернет оплачивает <span class="bold">Арендатор</span> (Арендодатель / Арендатор).
-            </div>
-            
-            <div class="clause">
-                <span class="clause-number">2.8.</span> В случае наличия счетчиков горячей и холодной воды оплату за воду производит <span class="bold">Арендатор</span> (Арендодатель / Арендатор). Показания счетчиков на дату передачи помещения в найм: горячей воды <span class="underline">${data.hotWaterCounter}</span>, холодной воды <span class="underline">${data.coldWaterCounter}</span>.
-            </div>
-            
-            <div class="signature-block">
-                <div class="signature">
-                    <div>Арендодатель:</div>
-                    <div class="signature-line"></div>
-                    <div>(подпись)</div>
-                </div>
-                <div class="signature">
-                    <div>Арендатор:</div>
-                    <div class="signature-line"></div>
-                    <div>(подпись)</div>
-                </div>
-            </div>
-            
-            <div class="clause">
                 <span class="clause-number">2.9.</span> С целью материального подтверждения обязательств по п.п. 4.2. и 4.3. настоящего Договора Арендатор передает Арендодателю страховой депозит в размере: <span class="bold">${data.depositAmount} (${data.depositAmountWords})</span> рублей.
             </div>
             
@@ -325,6 +312,18 @@ function generateContractHTML(data) {
                 
                 <div class="clause">
                     <span class="clause-number">3.2.</span> Арендодатель не в праве чинить препятствия Арендатору в правомерном пользовании жилым помещением.
+                </div>
+                
+                <div class="clause">
+                    <span class="clause-number">3.3.</span> Арендодатель в праве посещать сданное им в наем жилое помещение и производить его внешний осмотр в присутствии Арендатора по предварительному с ним соглашению, но не чаще <span class="bold">2 (двух)</span> раз в месяц.
+                </div>
+                
+                <div class="clause">
+                    <span class="clause-number">3.4.</span> Арендодатель обязан осуществлять техобслуживание жилого помещения и оборудования в нем. Если Арендодатель окажется не в состоянии организовать необходимые ремонтные работы, Арендатор имеет право с письменного разрешения Арендодателя нанять третье лицо для выполнения таких работ или выполнить эти работы самостоятельно (по выбору Арендодателя) за цену, согласованную с Арендодателем с последующим вычетом стоимости таких работ из оплаты за аренду. В случае если неисправность или поломка любого из элементов или технических систем произошли по вине Арендатора, работы по устранению неисправностей и приведению жилого помещения в надлежащее состояние будут организованы и выполнены или Арендатором за свой счет, или Арендодателем за счет Арендатора (по выбору Арендатора).
+                </div>
+                
+                <div class="clause">
+                    <span class="clause-number">3.5.</span> Арендодатель не несет ответственности за действия Арендатора и за действия граждан, проживающих по п.5, перед третьими лицами за возможный ущерб, нанесенный третьим лицам по вине Арендатора.
                 </div>
             </div>
             
@@ -347,43 +346,13 @@ function generateContractHTML(data) {
         <!-- Страница 4 -->
         <div class="contract-page">
             <div class="clause">
-                <span class="clause-number">3.3.</span> Арендодатель в праве посещать сданное им в наем жилое помещение и производить его внешний осмотр в присутствии Арендатора по предварительному с ним соглашению, но не чаще <span class="bold">2 (двух)</span> раз в месяц.
-            </div>
-            
-            <div class="clause">
-                <span class="clause-number">3.4.</span> Арендодатель обязан осуществлять техобслуживание жилого помещения и оборудования в нем. Если Арендодатель окажется не в состоянии организовать необходимые ремонтные работы, Арендатор имеет право с письменного разрешения Арендодателя нанять третье лицо для выполнения таких работ или выполнить эти работы самостоятельно (по выбору Арендодателя) за цену, согласованную с Арендодателем с последующим вычетом стоимости таких работ из оплаты за аренду. В случае если неисправность или поломка любого из элементов или технических систем произошли по вине Арендатора, работы по устранению неисправностей и приведению жилого помещения в надлежащее состояние будут организованы и выполнены или Арендатором за свой счет, или Арендодателем за счет Арендатора (по выбору Арендатора).
-            </div>
-            
-            <div class="clause">
-                <span class="clause-number">3.5.</span> Арендодатель не несет ответственности за действия Арендатора и за действия граждан, проживающих по п.5, перед третьими лицами за возможный ущерб, нанесенный третьим лицам по вине Арендатора.
-            </div>
-            
-            <div class="clause">
                 <span class="clause-number">3.6.</span> В случае нанесения ущерба по вине Арендатора жилому помещению, мебели, оборудованию и иному имуществу, Арендодатель имеет право удержать согласованную с Арендатором в письменной форме сумму ущерба из страхового депозита.
             </div>
             
             <div class="clause">
                 <span class="clause-number">3.7.</span> Ущерб жилому помещению, мебели, оборудованию и иному имуществу Арендодателя, нанесенный Арендатором, фиксируется сторонами в акте сдачи-приемки, подписываемом в соответствии с положением п. 4.10 настоящего Договора. В случае разногласий относительно факта причинения ущерба и его размера сторонами может быть назначена независимая экспертиза.
             </div>
-            
-            <div class="signature-block">
-                <div class="signature">
-                    <div>Арендодатель:</div>
-                    <div class="signature-line"></div>
-                    <div>(подпись)</div>
-                </div>
-                <div class="signature">
-                    <div>Арендатор:</div>
-                    <div class="signature-line"></div>
-                    <div>(подпись)</div>
-                </div>
-            </div>
-            
-            <div class="page-number">4</div>
-        </div>
 
-        <!-- Страница 5 -->
-        <div class="contract-page">
             <div class="section">
                 <div class="section-title">4. ПРАВА И ОБЯЗАННОСТИ АРЕНДАТОРА</div>
                 
@@ -422,6 +391,10 @@ function generateContractHTML(data) {
                 <div class="clause">
                     <span class="clause-number">4.9.</span> Арендатор не в праве производить переустройство и реконструкцию жилого помещения. Проводить ремонтные работы или осуществлять какие-либо изменения в жилом помещении Арендатор вправе только с письменного на то разрешения со стороны Арендодателя.
                 </div>
+                
+                <div class="clause">
+                    <span class="clause-number">4.10.</span> Арендатор обязан по окончании срока аренды или в случае досрочного расторжения Договора вернуть Арендодателю в исправном состоянии с учетом естественного износа жилое помещение, установленное в нем оборудование, мебель и иное имущество, полученные им в соответствии с актом приема-передачи по Приложению № 1 путем оформления акта сдачи-приемки по Приложению № 2.
+                </div>
             </div>
             
             <div class="signature-block">
@@ -437,28 +410,11 @@ function generateContractHTML(data) {
                 </div>
             </div>
             
-            <div class="page-number">5</div>
+            <div class="page-number">4</div>
         </div>
 
-        <!-- Страница 6 -->
+        <!-- Страница 5 -->
         <div class="contract-page">
-            <div class="clause">
-                <span class="clause-number">4.10.</span> Арендатор обязан по окончании срока аренды или в случае досрочного расторжения Договора вернуть Арендодателю в исправном состоянии с учетом естественного износа жилое помещение, установленное в нем оборудование, мебель и иное имущество, полученные им в соответствии с актом приема-передачи по Приложению № 1 путем оформления акта сдачи-приемки по Приложению № 2.
-            </div>
-            
-            <div class="signature-block">
-                <div class="signature">
-                    <div>Арендодатель:</div>
-                    <div class="signature-line"></div>
-                    <div>(подпись)</div>
-                </div>
-                <div class="signature">
-                    <div>Арендатор:</div>
-                    <div class="signature-line"></div>
-                    <div>(подпись)</div>
-                </div>
-            </div>
-
             <div class="section">
                 <div class="section-title">5. ЛИЦА, ИМЕЮЩИЕ ПРАВО ПРОЖИВАТЬ В ЖИЛОМ ПОМЕЩЕНИИ</div>
                 
@@ -470,25 +426,7 @@ function generateContractHTML(data) {
                     ${residentsHTML}
                 </div>
             </div>
-            
-            <div class="signature-block">
-                <div class="signature">
-                    <div>Арендодатель:</div>
-                    <div class="signature-line"></div>
-                    <div>(подпись)</div>
-                </div>
-                <div class="signature">
-                    <div>Арендатор:</div>
-                    <div class="signature-line"></div>
-                    <div>(подпись)</div>
-                </div>
-            </div>
-            
-            <div class="page-number">6</div>
-        </div>
 
-        <!-- Страница 7 -->
-        <div class="contract-page">
             <div class="section">
                 <div class="section-title">6. ОТВЕТСТВЕННОСТИ СТОРОН</div>
                 
@@ -530,10 +468,10 @@ function generateContractHTML(data) {
                 </div>
             </div>
             
-            <div class="page-number">7</div>
+            <div class="page-number">5</div>
         </div>
 
-        <!-- Страница 8 -->
+        <!-- Страница 6 -->
         <div class="contract-page">
             <div class="section">
                 <div class="section-title">7. РАСТОРЖЕНИЕ ДОГОВОРА АРЕНДЫ ЖИЛОГО ПОМЕЩЕНИЯ</div>
@@ -613,7 +551,7 @@ function generateContractHTML(data) {
                 </div>
             </div>
             
-            <div class="page-number">8</div>
+            <div class="page-number">6</div>
         </div>
     `;
 }
@@ -663,34 +601,14 @@ function collectFormData() {
         
         if (isNaN(n) || n === 0) return 'ноль';
         
-        // Десятки тысяч
-        if (n >= 10000) {
-            const tenThousands = Math.floor(n / 10000);
-            n %= 10000;
-            if (tenThousands === 1) result += 'десять ';
-            else if (tenThousands === 2) result += 'двадцать ';
-            else if (tenThousands === 3) result += 'тридцать ';
-            else if (tenThousands === 4) result += 'сорок ';
-            else if (tenThousands === 5) result += 'пятьдесят ';
-            else if (tenThousands === 6) result += 'шестьдесят ';
-            else if (tenThousands === 7) result += 'семьдесят ';
-            else if (tenThousands === 8) result += 'восемьдесят ';
-            else if (tenThousands === 9) result += 'девяносто ';
-        }
-        
         // Тысячи
         if (n >= 1000) {
-            const thousands = Math.floor(n / 1000);
+            const th = Math.floor(n / 1000);
+            if (th === 1) result += 'одна тысяча ';
+            else if (th === 2) result += 'две тысячи ';
+            else if (th < 5) result += numberToWords(th) + ' тысячи ';
+            else result += numberToWords(th) + ' тысяч ';
             n %= 1000;
-            if (thousands === 1) result += 'одна тысяча ';
-            else if (thousands === 2) result += 'две тысячи ';
-            else if (thousands === 3) result += 'три тысячи ';
-            else if (thousands === 4) result += 'четыре тысячи ';
-            else if (thousands === 5) result += 'пять тысяч ';
-            else if (thousands === 6) result += 'шесть тысяч ';
-            else if (thousands === 7) result += 'семь тысяч ';
-            else if (thousands === 8) result += 'восемь тысяч ';
-            else if (thousands === 9) result += 'девять тысяч ';
         }
         
         // Сотни
@@ -718,6 +636,8 @@ function collectFormData() {
     };
     
     const currentDate = new Date();
+    const contractStartDate = new Date(document.getElementById('contractStart').value);
+    const contractEndDate = new Date(document.getElementById('contractEnd').value);
     
     return {
         // Арендодатель
@@ -747,13 +667,13 @@ function collectFormData() {
         rentAmountWords: numberToWords(document.getElementById('rentAmount').value),
         depositAmount: document.getElementById('depositAmount').value,
         depositAmountWords: numberToWords(document.getElementById('depositAmount').value),
-        contractStart: formatDateRU(new Date(document.getElementById('contractStart').value)),
-        contractEnd: formatDateRU(new Date(document.getElementById('contractEnd').value)),
+        contractStart: formatDateRU(contractStartDate),
+        contractEnd: formatDateRU(contractEndDate),
         
         // Счетчики
-        electricityCounter: document.getElementById('electricityCounter').value || '_________',
-        hotWaterCounter: document.getElementById('hotWaterCounter').value || '_________',
-        coldWaterCounter: document.getElementById('coldWaterCounter').value || '_________',
+        electricityCounter: document.getElementById('electricityCounter').value,
+        hotWaterCounter: document.getElementById('hotWaterCounter').value,
+        coldWaterCounter: document.getElementById('coldWaterCounter').value,
         
         // Проживающие
         residents: residents,
@@ -841,20 +761,17 @@ async function downloadPDF() {
         const doc = new jsPDF({
             orientation: 'portrait',
             unit: 'mm',
-            format: 'a4',
-            putOnlyUsedFonts: true
+            format: 'a4'
         });
         
         // Получаем все страницы договора
         const pages = document.querySelectorAll('.contract-page');
         
         for (let i = 0; i < pages.length; i++) {
-            if (i > 0) {
-                doc.addPage();
-            }
+            const page = pages[i];
             
             // Конвертируем страницу в изображение
-            const canvas = await html2canvas(pages[i], {
+            const canvas = await html2canvas(page, {
                 scale: 2,
                 useCORS: true,
                 logging: false,
@@ -862,11 +779,16 @@ async function downloadPDF() {
             });
             
             const imgData = canvas.toDataURL('image/png');
-            const imgWidth = 170; // ширина для A4 с отступами
+            const imgWidth = 210; // A4 ширина в мм
             const imgHeight = (canvas.height * imgWidth) / canvas.width;
             
-            // Добавляем изображение в PDF
-            doc.addImage(imgData, 'PNG', 20, 20, imgWidth, imgHeight);
+            // Если это не первая страница, добавляем новую
+            if (i > 0) {
+                doc.addPage();
+            }
+            
+            // Добавляем изображение на страницу PDF
+            doc.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
         }
         
         // Сохраняем файл
@@ -896,146 +818,98 @@ function printContract() {
             <style>
                 @media print {
                     body {
-                        font-family: 'Times New Roman', serif;
-                        font-size: 12pt;
-                        line-height: 1.5;
                         margin: 0;
                         padding: 0;
                     }
                     .contract-page {
-                        width: 210mm;
-                        min-height: 297mm;
-                        margin: 0 auto 0;
-                        padding: 20mm;
-                        box-sizing: border-box;
                         page-break-after: always;
+                        padding: 25mm;
+                        min-height: 297mm;
+                        background: white;
+                        box-sizing: border-box;
                         position: relative;
+                        font-family: 'Times New Roman', serif;
+                        font-size: 12pt;
+                        line-height: 1.6;
                     }
                     .contract-page:last-child {
                         page-break-after: auto;
                     }
-                    .contract-header {
-                        text-align: center;
-                        margin-bottom: 30px;
-                        padding-bottom: 20px;
-                        border-bottom: 1px solid #000;
-                    }
-                    .contract-title {
-                        font-size: 16pt;
-                        font-weight: bold;
-                        margin-bottom: 10px;
-                    }
-                    .section-title {
-                        font-weight: bold;
-                        text-decoration: underline;
-                        margin: 25px 0 15px;
-                    }
-                    .clause {
-                        margin-bottom: 12px;
-                        text-align: justify;
-                    }
-                    .signature-block {
-                        position: absolute;
-                        bottom: 40px;
-                        left: 20mm;
-                        right: 20mm;
-                        display: flex;
-                        justify-content: space-between;
-                    }
-                    .signature {
-                        width: 45%;
-                        text-align: center;
-                    }
-                    .signature-line {
-                        border-top: 1px solid #000;
-                        margin-top: 40px;
-                        width: 100%;
-                    }
-                    .underline {
-                        text-decoration: underline;
-                    }
-                    .bold {
-                        font-weight: bold;
-                    }
-                    .indent {
-                        margin-left: 20px;
-                        margin-top: 10px;
-                    }
-                    .page-number {
-                        position: absolute;
-                        bottom: 20px;
-                        right: 20px;
-                        font-size: 10pt;
-                        color: #666;
+                    .no-print {
+                        display: none !important;
                     }
                     @page {
-                        margin: 20mm;
-                        size: A4;
+                        margin: 25mm;
                     }
-                    .no-print { display: none !important; }
                 }
                 @media screen {
                     body {
-                        font-family: 'Times New Roman', serif;
-                        font-size: 12pt;
-                        line-height: 1.5;
-                        margin: 0;
                         padding: 20px;
                         background: #f5f5f5;
                     }
                     .contract-page {
-                        width: 210mm;
-                        min-height: 297mm;
-                        margin: 0 auto 20px;
-                        padding: 20mm;
-                        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                        margin-bottom: 20px;
                         background: white;
-                        box-sizing: border-box;
-                        position: relative;
+                        padding: 30px;
+                        border-radius: 5px;
+                        box-shadow: 0 0 10px rgba(0,0,0,0.1);
                     }
-                    .contract-header {
-                        text-align: center;
-                        margin-bottom: 30px;
-                        padding-bottom: 20px;
-                        border-bottom: 1px solid #000;
-                    }
-                    .section-title {
-                        font-weight: bold;
-                        text-decoration: underline;
-                        margin: 25px 0 15px;
-                    }
-                    .clause {
-                        margin-bottom: 12px;
-                        text-align: justify;
-                    }
-                    .signature-block {
-                        position: absolute;
-                        bottom: 40px;
-                        left: 20mm;
-                        right: 20mm;
-                        display: flex;
-                        justify-content: space-between;
-                    }
-                    .signature {
-                        width: 45%;
-                        text-align: center;
-                    }
-                    .signature-line {
-                        border-top: 1px solid #000;
-                        margin-top: 40px;
-                        width: 100%;
-                    }
+                }
+                .contract-header {
+                    text-align: center;
+                    margin-bottom: 25px;
+                    padding-bottom: 15px;
+                    border-bottom: 1px solid #000;
+                }
+                .contract-title {
+                    font-size: 14pt;
+                    font-weight: bold;
+                    text-transform: uppercase;
+                    margin-bottom: 8px;
+                }
+                .section-title {
+                    font-weight: bold;
+                    text-decoration: underline;
+                    margin: 20px 0 12px;
+                    font-size: 12pt;
+                }
+                .clause {
+                    margin-bottom: 12px;
+                    text-align: justify;
+                }
+                .signature-block {
+                    margin-top: 60px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-end;
+                }
+                .signature {
+                    width: 45%;
+                    text-align: center;
+                }
+                .signature-line {
+                    border-top: 1px solid #000;
+                    margin-top: 50px;
+                    padding-top: 5px;
+                    width: 100%;
+                }
+                .page-number {
+                    position: absolute;
+                    bottom: 15mm;
+                    right: 25mm;
+                    font-size: 10pt;
+                    color: #666;
                 }
             </style>
         </head>
         <body>
             ${printContent}
-            <div class="no-print" style="position: fixed; bottom: 20px; right: 20px; background: white; padding: 10px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
-                <button onclick="window.print()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">
-                    Печать
+            <div class="no-print" style="position: fixed; bottom: 20px; right: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 0 20px rgba(0,0,0,0.2);">
+                <button onclick="window.print()" style="padding: 10px 20px; background: #4361ee; color: white; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px; font-size: 14px;">
+                    <i class="fas fa-print"></i> Печать
                 </button>
-                <button onclick="window.close()" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                    Закрыть
+                <button onclick="window.close()" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px;">
+                    <i class="fas fa-times"></i> Закрыть
                 </button>
             </div>
         </body>
@@ -1049,13 +923,6 @@ function printContract() {
     setTimeout(() => {
         printWindow.print();
     }, 1000);
-}
-
-// Завершить
-function finish() {
-    if (confirm('Спасибо за использование генератора договоров!\n\nНачать новый договор?')) {
-        location.reload();
-    }
 }
 
 // Вспомогательные функции
@@ -1124,10 +991,7 @@ function saveFormData() {
             residents: Array.from(document.querySelectorAll('.resident-item')).map(item => ({
                 name: item.querySelector('.resident-name').value,
                 birthdate: item.querySelector('.resident-birthdate').value
-            })),
-            
-            // Текущий шаг
-            currentStep: currentStep
+            }))
         };
         
         localStorage.setItem('rentalContractData', JSON.stringify(data));
@@ -1190,11 +1054,6 @@ function loadSavedData() {
             });
         } else {
             initResidents();
-        }
-        
-        // Восстанавливаем текущий шаг
-        if (data.currentStep) {
-            goToStep(data.currentStep);
         }
         
     } catch (error) {
