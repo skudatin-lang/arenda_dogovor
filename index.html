@@ -16,7 +16,7 @@
                 <i class="fas fa-file-contract"></i>
                 <h1>Генератор договора аренды</h1>
             </div>
-            <p class="subtitle">Заполните форму для автоматического создания договора</p>
+            <p class="subtitle">Заполните данные для автоматического формирования договора</p>
         </header>
 
         <!-- Прогресс-бар -->
@@ -40,7 +40,7 @@
         <section id="step1" class="step active">
             <div class="step-header">
                 <h2><i class="fas fa-edit"></i> Заполнение данных</h2>
-                <p>Введите информацию для договора аренды квартиры</p>
+                <p>Введите все необходимые данные для формирования договора</p>
             </div>
 
             <div class="data-container">
@@ -52,7 +52,7 @@
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="landlordName">ФИО полностью *</label>
-                            <input type="text" id="landlordName" placeholder="Любимова Ольга Викторовна" required>
+                            <input type="text" id="landlordName" placeholder="Любимова Ольга Викторовна" value="Любимова Ольга Викторовна">
                         </div>
                         <div class="form-group">
                             <label for="landlordPassport">Паспорт (серия номер) *</label>
@@ -85,7 +85,7 @@
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="tenantName">ФИО полностью *</label>
-                            <input type="text" id="tenantName" placeholder="Янгилжан Ускиновна Хайтбаева" required>
+                            <input type="text" id="tenantName" placeholder="Янгилжан Ускиновна Хайтбаева" value="Янгилжан Ускиновна Хайтбаева">
                         </div>
                         <div class="form-group">
                             <label for="tenantPassport">Паспорт (серия номер) *</label>
@@ -118,19 +118,20 @@
                     <div class="form-grid">
                         <div class="form-group full-width">
                             <label for="apartmentAddress">Адрес квартиры *</label>
-                            <input type="text" id="apartmentAddress" placeholder="г. Москва, Волгоградский проспект дом 164 корп. 3, кв. 22" required>
+                            <input type="text" id="apartmentAddress" placeholder="г. Москва, Волгоградский проспект дом 164 корп. 3, кв. 22" 
+                                   value="г. Москва, Волгоградский проспект дом 164 корп. 3, кв. 22" required>
                         </div>
                         <div class="form-group">
                             <label for="apartmentArea">Площадь (кв.м) *</label>
-                            <input type="number" id="apartmentArea" value="58" required>
+                            <input type="number" id="apartmentArea" placeholder="58" value="58" required>
                         </div>
                         <div class="form-group">
                             <label for="roomsCount">Количество комнат *</label>
-                            <input type="number" id="roomsCount" value="3" required>
+                            <input type="number" id="roomsCount" placeholder="3" value="3" required>
                         </div>
                         <div class="form-group full-width">
                             <label for="basisDocument">Основание собственности *</label>
-                            <input type="text" id="basisDocument" value="Наследство по закону" required>
+                            <input type="text" id="basisDocument" placeholder="Наследство по закону" value="Наследство по закону" required>
                         </div>
                     </div>
                 </div>
@@ -143,11 +144,11 @@
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="rentAmount">Сумма аренды (руб/мес) *</label>
-                            <input type="number" id="rentAmount" value="47000" required>
+                            <input type="number" id="rentAmount" placeholder="47000" value="47000" required>
                         </div>
                         <div class="form-group">
                             <label for="depositAmount">Депозит (руб) *</label>
-                            <input type="number" id="depositAmount" value="47000" required>
+                            <input type="number" id="depositAmount" placeholder="47000" value="47000" required>
                         </div>
                         <div class="form-group">
                             <label for="contractStart">Начало аренды *</label>
@@ -217,13 +218,19 @@
                     <button class="btn-primary" onclick="downloadPDF()">
                         <i class="fas fa-download"></i> Скачать PDF
                     </button>
-                    <button class="btn-secondary" onclick="goToStep(1)">
-                        <i class="fas fa-edit"></i> Редактировать
-                    </button>
                 </div>
                 <div class="contract-preview" id="contractPreview">
                     <!-- Договор будет вставлен здесь -->
                 </div>
+            </div>
+
+            <div class="step-actions">
+                <button class="btn-secondary" onclick="goToStep(1)">
+                    <i class="fas fa-arrow-left"></i> Редактировать данные
+                </button>
+                <button class="btn-primary" onclick="finish()">
+                    <i class="fas fa-check"></i> Завершить
+                </button>
             </div>
         </section>
     </div>

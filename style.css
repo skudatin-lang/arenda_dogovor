@@ -197,7 +197,7 @@ body {
 
 .step-actions {
     display: flex;
-    justify-content: center;
+    justify-content: space-between;
     margin-top: 40px;
     padding-top: 20px;
     border-top: 1px solid #e9ecef;
@@ -326,8 +326,6 @@ body {
     margin-bottom: 20px;
     padding-bottom: 20px;
     border-bottom: 1px solid #e9ecef;
-    flex-wrap: wrap;
-    justify-content: center;
 }
 
 .contract-preview {
@@ -336,113 +334,121 @@ body {
     padding: 30px;
     border: 1px solid #e9ecef;
     font-family: 'Times New Roman', serif;
-    line-height: 1.6;
+    line-height: 1.5;
     font-size: 14px;
-    max-height: 600px;
+    max-height: 800px;
     overflow-y: auto;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.05);
 }
 
-/* Стили для договора внутри предпросмотра */
-.contract-preview .page {
+/* Стили для отображения страниц договора */
+.contract-page {
+    width: 210mm;
     min-height: 297mm;
+    margin: 0 auto 20px;
     padding: 20mm;
-    margin-bottom: 20px;
-    background: white;
     box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    background: white;
+    box-sizing: border-box;
     position: relative;
-    page-break-after: always;
 }
 
-.contract-preview .page:last-child {
+.contract-page:last-child {
     margin-bottom: 0;
 }
 
-.contract-preview .contract-header {
+.contract-header {
     text-align: center;
     margin-bottom: 30px;
     padding-bottom: 20px;
     border-bottom: 1px solid #000;
 }
 
-.contract-preview .contract-title {
+.contract-title {
     font-size: 16pt;
     font-weight: bold;
     margin-bottom: 10px;
-    text-transform: uppercase;
 }
 
-.contract-preview .contract-date {
+.contract-subtitle {
+    font-size: 14pt;
+    margin-bottom: 10px;
+}
+
+.contract-date {
     font-size: 12pt;
     margin-top: 15px;
 }
 
-.contract-preview .section {
+.section {
     margin: 25px 0;
 }
 
-.contract-preview .section-title {
+.section-title {
     font-weight: bold;
     text-decoration: underline;
     margin-bottom: 15px;
     font-size: 12pt;
 }
 
-.contract-preview .clause {
+.clause {
     margin-bottom: 12px;
     text-align: justify;
-    font-size: 11pt;
 }
 
-.contract-preview .clause-number {
+.clause-number {
     font-weight: bold;
 }
 
-.contract-preview .signature-block {
-    margin-top: 50px;
+.signature-block {
+    position: absolute;
+    bottom: 40px;
+    left: 20mm;
+    right: 20mm;
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
-    position: absolute;
-    bottom: 30mm;
-    left: 20mm;
-    right: 20mm;
 }
 
-.contract-preview .signature {
+.signature {
     width: 45%;
     text-align: center;
 }
 
-.contract-preview .signature-line {
+.signature-line {
     border-top: 1px solid #000;
     margin-top: 40px;
     padding-top: 5px;
     width: 100%;
 }
 
-.contract-preview .underline {
+.underline {
     text-decoration: underline;
 }
 
-.contract-preview .bold {
+.bold {
     font-weight: bold;
 }
 
-.contract-preview .indent {
-    padding-left: 20px;
-    margin: 5px 0;
+.indent {
+    margin-left: 20px;
+    margin-top: 10px;
+    margin-bottom: 10px;
 }
 
-.contract-preview .page-number {
+.page-number {
     position: absolute;
-    bottom: 10mm;
-    right: 20mm;
+    bottom: 20px;
+    right: 20px;
     font-size: 10pt;
     color: #666;
 }
 
-.contract-preview .passport-data {
+.resident-line {
+    margin-bottom: 8px;
+    padding-left: 20px;
+}
+
+.passport-data {
     margin: 15px 0;
     padding: 10px;
     border: 1px solid #ddd;
@@ -528,20 +534,13 @@ body {
         justify-content: center;
     }
     
-    .contract-toolbar {
-        flex-direction: column;
-    }
-    
-    .contract-preview {
+    .contract-page {
+        width: 100%;
         padding: 15px;
+        box-shadow: none;
     }
     
-    .contract-preview .page {
-        padding: 15mm 10mm;
-        margin: 10px 0;
-    }
-    
-    .contract-preview .signature-block {
+    .signature-block {
         position: relative;
         bottom: auto;
         left: auto;
@@ -551,7 +550,7 @@ body {
         gap: 20px;
     }
     
-    .contract-preview .signature {
+    .signature {
         width: 100%;
     }
 }
@@ -569,7 +568,7 @@ body {
         padding: 15px;
     }
     
-    .contract-preview .page {
-        padding: 10mm 5mm;
+    .contract-preview {
+        padding: 15px;
     }
 }
